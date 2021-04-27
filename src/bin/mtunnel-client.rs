@@ -1,22 +1,27 @@
-use std::io;
-use std::pin::Pin;
+use std::fs::File;
+use std::io::{self, BufReader};
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use h2::{client, RecvStream, SendStream};
+use h2::client::{self, SendRequest};
 use http::Request;
-use tokio::io::{copy, AsyncRead, AsyncWrite, ReadBuf};
+use mtunnel::{other, Stream};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::{rustls::ClientConfig, webpki::DNSNameRef, TlsConnector};
 
 #[tokio::main]
 pub async fn main() -> io::Result<()> {
-    let listener = TcpListener::bind("0.0.0.0:8080").await?;
+    env_logger::init();
+
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
     let mut config = ClientConfig::new();
+    let mut pem = BufReader::new(File::open("ca.pem")?);
     config
         .root_store
-        .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+        .add_pem_file(&mut pem)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))?;
+
+    config.set_protocols(&[b"h2".to_vec()]);
     let connector = TlsConnector::from(Arc::new(config));
 
     let stream = TcpStream::connect("127.0.0.1:8081").await?;
@@ -26,70 +31,47 @@ pub async fn main() -> io::Result<()> {
 
     let (h2, connection) = client::handshake(stream)
         .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| other(&e.to_string()))?;
 
     tokio::spawn(async move {
-        connection.await.unwrap();
+        if let Err(e) = connection.await {
+            log::error!("h2 underlay connection err {:?}", e);
+        }
     });
 
-    let mut h2 = h2
-        .ready()
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+    let mut h2 = h2.ready().await.map_err(|e| other(&e.to_string()))?;
 
     loop {
-        let (socket, _) = listener.accept().await?;
-        let request = Request::new(());
-        let (response, send_stream) = h2.send_request(request, false).unwrap();
-        let recv_stream = response.await.unwrap().into_body();
-        let remote_stream = Stream {
-            recv_stream,
-            send_stream,
-        };
-
-        tokio::spawn(async move {
-            if let Err(e) = proxy(socket, remote_stream).await {
-                log::error!("proxy fail: {:?}", e);
+        match listener.accept().await {
+            Ok((stream, addr)) => {
+                log::debug!("accept tcp stream from {:?}", addr);
+                if let Err(e) = proxy(stream, &mut h2).await {
+                    log::error!("proxy error {:?}", e);
+                }
             }
-        });
+            Err(e) => {
+                log::error!("accept fail: {:?}", e);
+            }
+        }
     }
 }
 
-struct Stream {
-    recv_stream: RecvStream,
-    send_stream: SendStream<Bytes>,
-}
+async fn proxy(stream: TcpStream, h2: &mut SendRequest<Bytes>) -> io::Result<()> {
+    match h2.send_request(Request::new(()), false) {
+        Ok((response, send_stream)) => {
+            let recv_stream = response
+                .await
+                .map_err(|e| other(&e.to_string()))?
+                .into_body();
 
-impl AsyncRead for Stream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        unimplemented!();
+            log::debug!("proxy to h2 stream");
+            tokio::spawn(async move {
+                mtunnel::proxy(stream, Stream::new(send_stream, recv_stream)).await;
+            });
+        }
+        Err(e) => {
+            log::error!("send stream error {:?}", e);
+        }
     }
-}
-
-impl AsyncWrite for Stream {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
-        unimplemented!();
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        unimplemented!();
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        unimplemented!();
-    }
-}
-
-async fn proxy(mut socket: TcpStream, mut stream: Stream) -> io::Result<()> {
-    let (mut socket_reader, mut socket_writer) = socket.split();
-    copy(&mut socket_reader, &mut stream).await;
     Ok(())
 }
