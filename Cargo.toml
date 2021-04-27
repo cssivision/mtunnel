@@ -1,0 +1,8 @@
+[package]
+name = "mtunnel"
+version = "0.1.0"
+authors = ["misakachen <misakachen@tencent.com>"]
+edition = "2018"
+
+[dependencies]
+tokio = "1"
