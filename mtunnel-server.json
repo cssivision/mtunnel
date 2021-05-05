@@ -1,0 +1,6 @@
+{
+    "local_addr": "0.0.0.0:8081",
+    "remote_addr": "127.0.0.1:8082",
+    "server_cert": "server.pem",
+    "server_key": "server.key"
+}
