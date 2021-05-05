@@ -7,7 +7,7 @@ use http::Response;
 use mtunnel::{other, Stream};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_rustls::rustls::internal::pemfile::{certs, pkcs8_private_keys};
+use tokio_rustls::rustls::internal::pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
 use tokio_rustls::rustls::{Certificate, NoClientAuth, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
 
@@ -15,11 +15,11 @@ use tokio_rustls::TlsAcceptor;
 pub async fn main() -> io::Result<()> {
     env_logger::init();
 
-    let mut keys = load_keys("./server.key")?;
-    let certs = load_certs("./server.pem")?;
+    let key = load_keys("server.key")?;
+    let certs = load_certs("server.pem")?;
     let mut config = ServerConfig::new(NoClientAuth::new());
     config
-        .set_single_cert(certs, keys.remove(0))
+        .set_single_cert(certs, key)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
     config.set_protocols(&[b"h2".to_vec()]);
 
@@ -29,12 +29,18 @@ pub async fn main() -> io::Result<()> {
     loop {
         if let Ok((stream, addr)) = listener.accept().await {
             log::debug!("accept stream from {:?}", addr);
-            let stream = acceptor.accept(stream).await?;
-            tokio::spawn(async move {
-                if let Err(e) = proxy(stream, &addr).await {
-                    log::error!("proxy h2 connection fail: {:?}", e);
+            match acceptor.accept(stream).await {
+                Ok(stream) => {
+                    tokio::spawn(async move {
+                        if let Err(e) = proxy(stream, &addr).await {
+                            log::error!("proxy h2 connection fail: {:?}", e);
+                        }
+                    });
                 }
-            });
+                Err(e) => {
+                    log::error!("accept stream err {:?}", e);
+                }
+            }
         }
     }
 }
@@ -72,7 +78,16 @@ fn load_certs(path: &str) -> io::Result<Vec<Certificate>> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))
 }
 
-fn load_keys(path: &str) -> io::Result<Vec<PrivateKey>> {
-    pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
+fn load_keys(path: &str) -> io::Result<PrivateKey> {
+    if let Ok(mut keys) = pkcs8_private_keys(&mut BufReader::new(File::open(path)?)) {
+        if !keys.is_empty() {
+            return Ok(keys.remove(0));
+        }
+    }
+    if let Ok(mut keys) = rsa_private_keys(&mut BufReader::new(File::open(path)?)) {
+        if !keys.is_empty() {
+            return Ok(keys.remove(0));
+        }
+    }
+    Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
 }
