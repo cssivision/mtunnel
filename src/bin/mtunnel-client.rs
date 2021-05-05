@@ -9,24 +9,29 @@ use mtunnel::{other, Stream};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::{rustls::ClientConfig, webpki::DNSNameRef, TlsConnector};
 
+use mtunnel::args::parse_args;
+use mtunnel::ALPN_HTTP2;
+
 #[tokio::main]
 pub async fn main() -> io::Result<()> {
     env_logger::init();
+    let cfg = parse_args("mtunnel-client").expect("invalid config");
+    log::info!("{}", serde_json::to_string_pretty(&cfg).unwrap());
 
-    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = TcpListener::bind(&cfg.local_addr).await?;
     let mut config = ClientConfig::new();
-    let mut pem = BufReader::new(File::open("ca.pem")?);
+    let mut pem = BufReader::new(File::open(&cfg.ca_certificate)?);
     config
         .root_store
         .add_pem_file(&mut pem)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))?;
 
-    config.set_protocols(&[b"h2".to_vec()]);
+    config.set_protocols(&[ALPN_HTTP2.to_vec()]);
     let connector = TlsConnector::from(Arc::new(config));
 
-    let stream = TcpStream::connect("127.0.0.1:8081").await?;
-    let domain = DNSNameRef::try_from_ascii_str("example.com")
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid dnsname"))?;
+    let stream = TcpStream::connect(&cfg.remote_addr).await?;
+    let domain = DNSNameRef::try_from_ascii_str(&cfg.domain_name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid domain name"))?;
     let stream = connector.connect(domain, stream).await?;
 
     let (h2, connection) = client::handshake(stream)
