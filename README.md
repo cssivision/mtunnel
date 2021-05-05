@@ -1,2 +1,2 @@
 # mtunnel 
-A Tcp over Http2 proxy.
+A tcp over http2 proxy.
