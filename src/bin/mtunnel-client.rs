@@ -40,7 +40,6 @@ pub async fn main() -> io::Result<()> {
     });
 
     let mut h2 = h2.ready().await.map_err(|e| other(&e.to_string()))?;
-
     loop {
         match listener.accept().await {
             Ok((stream, addr)) => {

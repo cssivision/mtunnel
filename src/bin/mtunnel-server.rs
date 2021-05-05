@@ -1,6 +1,6 @@
-use std::fs::File;
 use std::io::{self, BufReader};
 use std::sync::Arc;
+use std::{fs::File, net::SocketAddr};
 
 use h2::server;
 use http::Response;
@@ -31,7 +31,7 @@ pub async fn main() -> io::Result<()> {
             log::debug!("accept stream from {:?}", addr);
             let stream = acceptor.accept(stream).await?;
             tokio::spawn(async move {
-                if let Err(e) = proxy(stream).await {
+                if let Err(e) = proxy(stream, &addr).await {
                     log::error!("proxy h2 connection fail: {:?}", e);
                 }
             });
@@ -39,13 +39,13 @@ pub async fn main() -> io::Result<()> {
     }
 }
 
-async fn proxy<T: AsyncRead + AsyncWrite + Unpin>(stream: T) -> io::Result<()> {
+async fn proxy<T: AsyncRead + AsyncWrite + Unpin>(stream: T, addr: &SocketAddr) -> io::Result<()> {
     let mut h2 = server::handshake(stream)
         .await
         .map_err(|e| other(&e.to_string()))?;
 
     while let Some(request) = h2.accept().await {
-        log::debug!("accept h2 stream from {:?}", request);
+        log::debug!("accept h2 stream from {}", addr);
         let (request, mut respond) = request.map_err(|e| other(&e.to_string()))?;
         let recv_stream = request.into_body();
         let send_stream = respond
