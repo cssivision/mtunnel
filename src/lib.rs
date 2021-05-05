@@ -47,6 +47,19 @@ impl RecvStream {
             read_closed: false,
         }
     }
+
+    pub fn poll_data(&mut self, cx: &mut Context<'_>) -> Poll<Option<io::Result<Bytes>>> {
+        self.inner
+            .poll_data(cx)
+            .map_err(|e| other(&format!("poll_data err: {:?}", e.to_string())))
+    }
+
+    fn release_capacity(&mut self, size: usize) -> io::Result<()> {
+        self.inner
+            .flow_control()
+            .release_capacity(size)
+            .map_err(|e| other(&e.to_string()))
+    }
 }
 
 struct SendStream {
@@ -56,6 +69,20 @@ struct SendStream {
 impl SendStream {
     fn new(s: h2::SendStream<Bytes>) -> SendStream {
         SendStream { inner: s }
+    }
+
+    pub fn send_data(&mut self, data: Bytes, end_of_stream: bool) -> io::Result<()> {
+        self.inner.send_data(data, end_of_stream).map_err(|e| {
+            other(&format!(
+                "poll_write err: {:?}, end_of_stream {}",
+                e.to_string(),
+                end_of_stream
+            ))
+        })
+    }
+
+    pub fn reserve_capacity(&mut self, capacity: usize) {
+        self.inner.reserve_capacity(capacity);
     }
 }
 
@@ -73,9 +100,10 @@ impl AsyncRead for Stream {
             }
 
             if !self.recv_stream.read_closed {
-                if let Some(data) = ready!(self.recv_stream.inner.poll_data(cx)) {
-                    self.recv_stream.buf =
-                        data.map_err(|e| other(&format!("poll_data err: {:?}", e.to_string())))?;
+                if let Some(data) = ready!(self.recv_stream.poll_data(cx)) {
+                    let data = data?;
+                    self.recv_stream.release_capacity(data.len())?;
+                    self.recv_stream.buf = data;
                 } else {
                     self.recv_stream.read_closed = self.recv_stream.inner.is_end_stream();
                 }
@@ -94,19 +122,14 @@ impl AsyncWrite for Stream {
         _: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        self.send_stream.inner.reserve_capacity(buf.len());
+        self.send_stream.reserve_capacity(buf.len());
         self.send_stream
-            .inner
-            .send_data(Bytes::copy_from_slice(buf), false)
-            .map_err(|e| other(&format!("poll_write err: {:?}", e.to_string())))?;
+            .send_data(Bytes::copy_from_slice(buf), false)?;
         Poll::Ready(Ok(buf.len()))
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.send_stream
-            .inner
-            .send_data(Bytes::new(), true)
-            .map_err(|e| other(&format!("poll_flush err: {:?}", e.to_string())))?;
+        self.send_stream.send_data(Bytes::new(), true)?;
         Poll::Ready(Ok(()))
     }
 
