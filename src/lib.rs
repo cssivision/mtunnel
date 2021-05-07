@@ -98,7 +98,7 @@ impl AsyncRead for Stream {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         loop {
-            if self.recv_stream.buf.len() != 0 {
+            if !self.recv_stream.buf.is_empty() {
                 let pos = self.recv_stream.buf.len().min(buf.remaining());
                 buf.put_slice(&self.recv_stream.buf.split_to(pos));
                 return Poll::Ready(Ok(()));
@@ -114,7 +114,7 @@ impl AsyncRead for Stream {
                 }
             }
 
-            if self.recv_stream.read_closed && self.recv_stream.buf.len() == 0 {
+            if self.recv_stream.read_closed && self.recv_stream.buf.is_empty() {
                 return Poll::Ready(Ok(()));
             }
         }
