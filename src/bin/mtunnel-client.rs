@@ -10,15 +10,10 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::{rustls::ClientConfig, webpki::DNSNameRef, TlsConnector};
 
 use mtunnel::args::parse_args;
+use mtunnel::config::Config;
 use mtunnel::ALPN_HTTP2;
 
-#[tokio::main]
-pub async fn main() -> io::Result<()> {
-    env_logger::init();
-    let cfg = parse_args("mtunnel-client").expect("invalid config");
-    log::info!("{}", serde_json::to_string_pretty(&cfg).unwrap());
-
-    let listener = TcpListener::bind(&cfg.local_addr).await?;
+fn tls_config(cfg: &Config) -> io::Result<ClientConfig> {
     let mut config = ClientConfig::new();
     let mut pem = BufReader::new(File::open(&cfg.ca_certificate)?);
     config
@@ -27,6 +22,17 @@ pub async fn main() -> io::Result<()> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))?;
 
     config.set_protocols(&[ALPN_HTTP2.to_vec()]);
+    Ok(config)
+}
+
+#[tokio::main]
+pub async fn main() -> io::Result<()> {
+    env_logger::init();
+    let cfg = parse_args("mtunnel-client").expect("invalid config");
+    log::info!("{}", serde_json::to_string_pretty(&cfg).unwrap());
+
+    let config = tls_config(&cfg)?;
+    let listener = TcpListener::bind(&cfg.local_addr).await?;
     let connector = TlsConnector::from(Arc::new(config));
 
     let stream = TcpStream::connect(&cfg.remote_addr).await?;
