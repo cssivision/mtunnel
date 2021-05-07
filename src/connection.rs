@@ -57,6 +57,7 @@ impl Connection {
             let (response, send_stream) = send_request
                 .send_request(Request::new(()), false)
                 .map_err(|e| {
+                    self.available.store(false, Ordering::Relaxed);
                     log::error!("send stream error {:?}", e);
                     other(&e.to_string())
                 })?;
@@ -64,6 +65,7 @@ impl Connection {
             let recv_stream = response
                 .await
                 .map_err(|e| {
+                    self.available.store(false, Ordering::Relaxed);
                     log::error!("response err {}", e);
                     other(&e.to_string())
                 })?
