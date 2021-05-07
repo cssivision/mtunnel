@@ -4,12 +4,14 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::time::Duration;
 
 use crate::{other, Stream};
 use bytes::Bytes;
 use h2::client::{self, SendRequest};
 use http::Request;
 use tokio::net::TcpStream;
+use tokio::time::sleep;
 use tokio_rustls::{rustls::ClientConfig, webpki::DNSNameRef, TlsConnector};
 
 pub struct Connection {
@@ -18,6 +20,7 @@ pub struct Connection {
     domain_name: String,
     send_request: Option<SendRequest<Bytes>>,
     available: Arc<AtomicBool>,
+    sleeps: usize,
 }
 
 impl Connection {
@@ -32,6 +35,7 @@ impl Connection {
             domain_name,
             send_request: None,
             available: Arc::new(AtomicBool::new(false)),
+            sleeps: 0,
         };
 
         conn.connect().await?;
@@ -40,7 +44,13 @@ impl Connection {
 
     pub async fn new_stream(&mut self) -> io::Result<Stream> {
         if !self.available.load(Ordering::Relaxed) {
-            self.connect().await?;
+            match self.reconnect().await {
+                Ok(()) => self.sleeps = 0,
+                Err(e) => {
+                    self.sleeps += 1;
+                    return Err(e);
+                }
+            }
         }
 
         if let Some(send_request) = self.send_request.as_mut() {
@@ -66,7 +76,19 @@ impl Connection {
     }
 
     async fn connect(&mut self) -> io::Result<()> {
+        self.reconnect().await
+    }
+
+    async fn reconnect(&mut self) -> io::Result<()> {
+        if self.sleeps > 0 {
+            let delay_ms = [50, 75, 100, 250, 500, 750, 1000]
+                .get(self.sleeps as usize)
+                .unwrap_or(&1000);
+            sleep(Duration::from_millis(*delay_ms)).await;
+        }
+
         self.available.store(false, Ordering::Relaxed);
+
         let tls_connector = TlsConnector::from(self.tls_config.clone());
         let domain = DNSNameRef::try_from_ascii_str(&self.domain_name).map_err(|e| {
             log::error!("domain err {:?}", e);
