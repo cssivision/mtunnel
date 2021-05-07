@@ -14,6 +14,7 @@ macro_rules! ready {
 
 pub mod args;
 pub mod config;
+pub mod connection;
 mod stream;
 
 pub use stream::Stream;
