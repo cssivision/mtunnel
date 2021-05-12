@@ -60,9 +60,9 @@ If you need to pass additional config you can use the `-config` parameter, here 
 ```
 openssl req -new -sha256 \
     -key mydomain.com.key \
-    -subj "/C=US/ST=North Carolina/O=ORG/OU=ORG_UNIT/CN=mydomain.com” \
+    -subj "/C=US/ST=North Carolina/O=ORG/OU=ORG_UNIT/CN=mydomain.com" \
     -reqexts SAN \
-    -config <(cat ./openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:mydomain.com”)) \
+    -config <(cat ./openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:mydomain.com,DNS:host1.mydomain.com")) \
     -out mydomain.com.csr
 ```
 
