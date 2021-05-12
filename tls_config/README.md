@@ -1,4 +1,4 @@
-# self signed certificate with-custom ca 
+# self signed certificate with custom ca 
 
 ## Create Root Key
 
