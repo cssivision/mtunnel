@@ -78,7 +78,12 @@ openssl req -in mydomain.com.csr -noout -text
 ## Generate the certificate using the `mydomain` csr and key along with the CA Root key
 
 ```
-openssl x509 -req -extfile <(printf "subjectAltName=DNS:mydomain.com") -days 120 -in mydomain.com.csr -CA rootCA.crt -CAkey root_rsa.key -CAcreateserial -out mydomain.com.crt -sha256
+openssl x509 -req -in mydomain.com.csr -CA rootCA.crt -CAkey rootCA.key -CAcreateserial -out mydomain.com.crt -days 1024 -sha256
+```
+
+If you need to pass additional config.
+```
+openssl x509 -req -extfile <(printf "subjectAltName=DNS:mydomain.com,DNS:host1.mydomain.com") -in mydomain.com.csr -CA rootCA.crt -CAkey root_rsa.key -CAcreateserial -out mydomain.com.crt -days 1024 -sha256
 ```
 
 ## Verify the certificate's content
