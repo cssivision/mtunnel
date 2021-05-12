@@ -57,6 +57,8 @@ openssl req -new -sha256 -key mydomain.com.key -subj "/C=CN/ST=CA/O=MyOrg, Inc./
 
 If you need to pass additional config you can use the `-config` parameter, here for example I want to add alternative names to my certificate.
 
+rustls need certificate with SAN, we need create using following: 
+
 ```
 openssl req -new -sha256 \
     -key mydomain.com.key \
