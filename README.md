@@ -7,9 +7,9 @@ https://github.com/cssivision/mtunnel/actions)
 A tcp over http2 + tls proxy.
 
 # Usage 
-1 get certificates, following [steps](https://github.com/cssivision/mtunnel/tree/main/tls_config).
+### get certificates, following [steps](https://github.com/cssivision/mtunnel/tree/main/tls_config).
 
-2 make your config
+### make your config
 client config:
 ```json
 {
@@ -30,7 +30,7 @@ server config:
 }
 ```
 
-3 start client and server
+### start client and server
 ```sh
 # start the server
 RUST_LOG=debug cargo run --bin mtunnel-server -- -c mtunnel-server.json 
