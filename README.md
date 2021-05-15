@@ -7,7 +7,7 @@ https://github.com/cssivision/mtunnel/actions)
 A tcp over http2 + tls proxy.
 
 # Usage 
-### 1. get certificates, following [steps](https://github.com/cssivision/mtunnel/tree/main/tls_config).
+### 1. get certificates, by following [steps](https://github.com/cssivision/mtunnel/tree/main/tls_config).
 
 ### 2. make your config
 client config:
