@@ -1,7 +1,8 @@
-use std::fs::File;
 use std::io::{self, BufReader};
+use std::{fs::File, time::Duration};
 
 use tokio::net::{TcpListener, TcpStream};
+use tokio::time::timeout;
 use tokio_rustls::rustls::ClientConfig;
 
 use mtunnel::args::parse_args;
@@ -48,7 +49,7 @@ pub async fn main() -> io::Result<()> {
 }
 
 async fn proxy(socket: TcpStream, h2: &mut Connection) -> io::Result<()> {
-    let stream = h2.new_stream().await?;
+    let stream = timeout(Duration::from_secs(3), h2.new_stream()).await??;
     tokio::spawn(async move {
         mtunnel::proxy(socket, stream).await;
     });
