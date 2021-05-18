@@ -2,11 +2,13 @@ use std::fs::File;
 use std::io::{self, BufReader};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use h2::server;
 use http::Response;
 use mtunnel::{other, Stream};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::time::timeout;
 use tokio_rustls::rustls::internal::pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
 use tokio_rustls::rustls::{Certificate, NoClientAuth, PrivateKey, ServerConfig};
 use tokio_rustls::{server::TlsStream, TlsAcceptor};
@@ -14,6 +16,8 @@ use tokio_rustls::{server::TlsStream, TlsAcceptor};
 use mtunnel::args::parse_args;
 use mtunnel::config::Config;
 use mtunnel::ALPN_HTTP2;
+
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 fn tls_config(cfg: &Config) -> io::Result<ServerConfig> {
     let key = load_keys(&cfg.server_key)?;
@@ -72,14 +76,21 @@ async fn proxy(stream: TlsStream<TcpStream>, addr: SocketAddr) -> io::Result<()>
 
         log::debug!("proxy tcp stream to {}", addr);
         tokio::spawn(async move {
-            match TcpStream::connect(addr).await {
+            match timeout(CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
                 Ok(stream) => {
-                    mtunnel::proxy(stream, Stream::new(send_stream, recv_stream)).await;
+                    match stream {
+                        Ok(stream) => {
+                            mtunnel::proxy(stream, Stream::new(send_stream, recv_stream)).await;
+                        }
+                        Err(e) => {
+                            log::error!("connect to {} err {:?}", &addr, e);
+                        }
+                    };
                 }
                 Err(e) => {
                     log::error!("connect to {} err {:?}", &addr, e);
                 }
-            };
+            }
         });
     }
     Ok(())
