@@ -11,7 +11,7 @@ use bytes::Bytes;
 use h2::client::{self, SendRequest};
 use http::Request;
 use tokio::net::TcpStream;
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 use tokio_rustls::{rustls::ClientConfig, webpki::DNSNameRef, TlsConnector};
 
 pub struct Connection {
@@ -97,7 +97,7 @@ impl Connection {
             io::Error::new(io::ErrorKind::InvalidInput, "invalid domain name")
         })?;
 
-        let stream = TcpStream::connect(self.addr).await?;
+        let stream = timeout(Duration::from_secs(3), TcpStream::connect(self.addr)).await??;
         stream.set_nodelay(true)?;
         let tls_stream = tls_connector.connect(domain, stream).await?;
         let (h2, connection) = client::handshake(tls_stream).await.map_err(|e| {
