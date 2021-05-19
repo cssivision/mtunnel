@@ -52,6 +52,7 @@ pub async fn main() -> io::Result<()> {
 }
 
 async fn proxy(socket: TcpStream, h2: &mut Connection) -> io::Result<()> {
+    log::debug!("new h2 stream");
     let stream = timeout(CONNECT_TIMEOUT, h2.new_stream()).await??;
     tokio::spawn(async move {
         mtunnel::proxy(socket, stream).await;
