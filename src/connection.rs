@@ -15,6 +15,7 @@ use tokio::time::{sleep, timeout};
 use tokio_rustls::{rustls::ClientConfig, webpki::DNSName, TlsConnector};
 
 const DEFAULT_CONNECTION_NUM: usize = 3;
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 
 pub struct Multiplexed {
@@ -106,7 +107,7 @@ impl Connection {
         }
 
         let tls_connector = TlsConnector::from(self.tls_config.clone());
-        let stream = timeout(Duration::from_secs(3), TcpStream::connect(self.addr)).await??;
+        let stream = timeout(DEFAULT_CONNECT_TIMEOUT, TcpStream::connect(self.addr)).await??;
         stream.set_nodelay(true)?;
         let tls_stream = tls_connector
             .connect(self.domain_name.as_ref(), stream)
