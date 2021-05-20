@@ -18,8 +18,8 @@ use mtunnel::config::Config;
 use mtunnel::ALPN_HTTP2;
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
-const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 5; // 5mb
-const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024 * 2; // 2mb
+const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 8; // 8mb
+const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024; // 1mb
 
 fn tls_config(cfg: &Config) -> io::Result<ServerConfig> {
     let key = load_keys(&cfg.server_key)?;

@@ -14,7 +14,7 @@ use tokio_rustls::{rustls::ClientConfig, webpki::DNSName, TlsConnector};
 const DEFAULT_CONNECTION_NUM: usize = 3;
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
-const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 5; // 5mb
+const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 16; // 16mb
 const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024 * 2; // 2mb
 
 pub struct Multiplexed {
