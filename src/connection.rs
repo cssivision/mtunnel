@@ -14,6 +14,8 @@ use tokio_rustls::{rustls::ClientConfig, webpki::DNSName, TlsConnector};
 const DEFAULT_CONNECTION_NUM: usize = 3;
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
+const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 5; // 5mb
+const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024 * 2; // 2mb
 
 pub struct Multiplexed {
     conns: Vec<Connection>,
@@ -109,7 +111,10 @@ impl Connection {
         let tls_stream = tls_connector
             .connect(self.domain_name.as_ref(), stream)
             .await?;
-        let (h2, connection) = client::handshake(tls_stream)
+        let (h2, connection) = client::Builder::new()
+            .initial_connection_window_size(DEFAULT_STREAM_WINDOW)
+            .initial_window_size(DEFAULT_CONN_WINDOW)
+            .handshake(tls_stream)
             .await
             .map_err(|e| other(&e.to_string()))?;
 
