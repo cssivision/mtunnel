@@ -1,9 +1,6 @@
 use std::io;
 use std::net::SocketAddr;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::{other, Stream};
@@ -52,7 +49,7 @@ struct Connection {
     addr: SocketAddr,
     domain_name: DNSName,
     send_request: Option<SendRequest<Bytes>>,
-    available: Arc<AtomicBool>,
+    available: bool,
     sleeps: usize,
 }
 
@@ -63,17 +60,17 @@ impl Connection {
             addr,
             domain_name,
             send_request: None,
-            available: Arc::new(AtomicBool::new(false)),
+            available: false,
             sleeps: 0,
         }
     }
 
     async fn new_stream(&mut self) -> io::Result<Stream> {
-        if !self.available.load(Ordering::Relaxed) {
+        if !self.available {
             match self.reconnect().await {
                 Ok(()) => {
-                    self.available.store(true, Ordering::Relaxed);
-                    self.sleeps = 0
+                    self.available = true;
+                    self.sleeps = 0;
                 }
                 Err(e) => {
                     log::error!("reconnect error {:?}", e);
@@ -84,7 +81,7 @@ impl Connection {
         }
 
         self.send_request().await.map_err(|e| {
-            self.available.store(false, Ordering::Relaxed);
+            self.available = false;
             log::error!("send request error {:?}", e);
             other(&e.to_string())
         })
@@ -116,11 +113,9 @@ impl Connection {
             .await
             .map_err(|e| other(&e.to_string()))?;
 
-        let available = self.available.clone();
         tokio::spawn(async move {
             if let Err(e) = connection.await {
                 log::error!("h2 underlay connection err {:?}", e);
-                available.store(false, Ordering::Relaxed);
             }
         });
 
