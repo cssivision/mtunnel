@@ -29,7 +29,7 @@ impl Multiplexed {
         domain_name: DNSName,
         n: usize,
     ) -> Multiplexed {
-        let n = if n == 0 { n } else { DEFAULT_CONNECTION_NUM };
+        let n = if n != 0 { n } else { DEFAULT_CONNECTION_NUM };
         let tls_config = Arc::new(tls_config);
         Multiplexed {
             conns: (0..n)
