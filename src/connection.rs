@@ -70,11 +70,13 @@ impl Connection {
     async fn new_stream(&mut self) -> io::Result<Stream> {
         if !self.available.load(Ordering::Relaxed) {
             match self.reconnect().await {
-                Ok(()) => self.sleeps = 0,
+                Ok(()) => {
+                    self.available.store(true, Ordering::Relaxed);
+                    self.sleeps = 0
+                }
                 Err(e) => {
                     log::error!("reconnect error {:?}", e);
                     self.sleeps += 1;
-                    self.available.store(true, Ordering::Relaxed);
                     return Err(e);
                 }
             }
