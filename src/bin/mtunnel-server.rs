@@ -18,6 +18,8 @@ use mtunnel::config::Config;
 use mtunnel::ALPN_HTTP2;
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 5; // 5mb
+const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024 * 2; // 2mb
 
 fn tls_config(cfg: &Config) -> io::Result<ServerConfig> {
     let key = load_keys(&cfg.server_key)?;
@@ -62,7 +64,10 @@ pub async fn main() -> io::Result<()> {
 }
 
 async fn proxy(stream: TlsStream<TcpStream>, addr: SocketAddr) -> io::Result<()> {
-    let mut h2 = server::handshake(stream)
+    let mut h2 = server::Builder::new()
+        .initial_window_size(DEFAULT_STREAM_WINDOW)
+        .initial_connection_window_size(DEFAULT_CONN_WINDOW)
+        .handshake(stream)
         .await
         .map_err(|e| other(&e.to_string()))?;
 
