@@ -112,8 +112,8 @@ impl Connection {
             .connect(self.domain_name.as_ref(), stream)
             .await?;
         let (h2, connection) = client::Builder::new()
-            .initial_connection_window_size(DEFAULT_STREAM_WINDOW)
-            .initial_window_size(DEFAULT_CONN_WINDOW)
+            .initial_connection_window_size(DEFAULT_CONN_WINDOW)
+            .initial_window_size(DEFAULT_STREAM_WINDOW)
             .handshake(tls_stream)
             .await
             .map_err(|e| other(&e.to_string()))?;

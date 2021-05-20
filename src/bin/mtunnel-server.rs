@@ -65,8 +65,8 @@ pub async fn main() -> io::Result<()> {
 
 async fn proxy(stream: TlsStream<TcpStream>, addr: SocketAddr) -> io::Result<()> {
     let mut h2 = server::Builder::new()
-        .initial_window_size(DEFAULT_STREAM_WINDOW)
         .initial_connection_window_size(DEFAULT_CONN_WINDOW)
+        .initial_window_size(DEFAULT_STREAM_WINDOW)
         .handshake(stream)
         .await
         .map_err(|e| other(&e.to_string()))?;
