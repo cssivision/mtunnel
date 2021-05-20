@@ -5,10 +5,11 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
 use tokio_rustls::rustls::ClientConfig;
+use tokio_rustls::webpki::DNSNameRef;
 
 use mtunnel::args::parse_args;
 use mtunnel::config::Config;
-use mtunnel::connection::Connection;
+use mtunnel::connection::Multiplexed;
 use mtunnel::ALPN_HTTP2;
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -34,7 +35,10 @@ pub async fn main() -> io::Result<()> {
     let tls_config = tls_config(&config)?;
     let listener = TcpListener::bind(&config.local_addr).await?;
     let remote_addr = config.remote_addr.parse().expect("invalid remote addr");
-    let mut h2 = Connection::new(tls_config, remote_addr, config.domain_name).await?;
+    let domain_name = DNSNameRef::try_from_ascii_str(&config.domain_name)
+        .expect("invalid domain name")
+        .to_owned();
+    let mut h2 = Multiplexed::new(tls_config, remote_addr, domain_name, config.conn_nums);
 
     loop {
         match listener.accept().await {
@@ -51,7 +55,7 @@ pub async fn main() -> io::Result<()> {
     }
 }
 
-async fn proxy(socket: TcpStream, h2: &mut Connection) -> io::Result<()> {
+async fn proxy(socket: TcpStream, h2: &mut Multiplexed) -> io::Result<()> {
     log::debug!("new h2 stream");
     let stream = timeout(CONNECT_TIMEOUT, h2.new_stream()).await??;
     tokio::spawn(async move {
