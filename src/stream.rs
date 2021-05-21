@@ -60,7 +60,7 @@ impl SendStream {
         SendStream { inner: s }
     }
 
-    pub fn send_data(&mut self, data: Bytes, end_of_stream: bool) -> io::Result<()> {
+    fn send_data(&mut self, data: Bytes, end_of_stream: bool) -> io::Result<()> {
         self.inner.send_data(data, end_of_stream).map_err(|e| {
             other(&format!(
                 "poll_write err: {:?}, end_of_stream {}",
@@ -70,11 +70,17 @@ impl SendStream {
         })
     }
 
-    pub fn reserve_capacity(&mut self, capacity: usize) {
+    fn reserve_capacity(&mut self, capacity: usize) {
         self.inner.reserve_capacity(capacity);
     }
 
-    pub fn send_reset(&mut self, reason: Reason) {
+    fn poll_capacity(&mut self, cx: &mut Context<'_>) -> Poll<Option<io::Result<usize>>> {
+        self.inner
+            .poll_capacity(cx)
+            .map_err(|e| other(&e.to_string()))
+    }
+
+    pub(crate) fn send_reset(&mut self, reason: Reason) {
         self.inner.send_reset(reason);
     }
 }
@@ -112,21 +118,26 @@ impl AsyncRead for Stream {
 impl AsyncWrite for Stream {
     fn poll_write(
         mut self: Pin<&mut Self>,
-        _: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    ) -> Poll<io::Result<usize>> {
         self.send_stream.reserve_capacity(buf.len());
+        let n = match ready!(self.send_stream.poll_capacity(cx)) {
+            Some(v) => v?,
+            None => return Poll::Ready(Ok(0)),
+        };
+        let size = n.min(buf.len());
         self.send_stream
-            .send_data(Bytes::copy_from_slice(buf), false)?;
-        Poll::Ready(Ok(buf.len()))
+            .send_data(Bytes::copy_from_slice(&buf[..size]), false)?;
+        Poll::Ready(Ok(size))
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.send_stream.send_data(Bytes::new(), true)?;
+    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.send_stream.send_data(Bytes::default(), true)?;
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 }
