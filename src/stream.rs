@@ -124,7 +124,7 @@ impl AsyncWrite for Stream {
         self.send_stream.reserve_capacity(buf.len());
         let n = match ready!(self.send_stream.poll_capacity(cx)) {
             Some(v) => v?,
-            None => return Poll::Ready(Ok(0)),
+            None => return Poll::Ready(Err(other("poll capacity unexpectedly closed"))),
         };
         let size = n.min(buf.len());
         self.send_stream
