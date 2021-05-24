@@ -75,9 +75,16 @@ impl SendStream {
     }
 
     fn poll_capacity(&mut self, cx: &mut Context<'_>) -> Poll<Option<io::Result<usize>>> {
+        if self.inner.capacity() > 0 {
+            return Poll::Ready(Some(Ok(self.inner.capacity())));
+        }
         self.inner
             .poll_capacity(cx)
             .map_err(|e| other(&e.to_string()))
+    }
+
+    pub fn poll_reset(&mut self, cx: &mut Context) -> Poll<io::Result<Reason>> {
+        self.inner.poll_reset(cx).map_err(|e| other(&e.to_string()))
     }
 
     pub(crate) fn send_reset(&mut self, reason: Reason) {
@@ -126,6 +133,15 @@ impl AsyncWrite for Stream {
             Some(v) => v?,
             None => return Poll::Ready(Err(other("poll capacity unexpectedly closed"))),
         };
+
+        if let Poll::Ready(reason) = self.send_stream.poll_reset(cx)? {
+            log::debug!("stream received RST_STREAM: {:?}", reason);
+            return Poll::Ready(Err(other(&format!(
+                "stream reset for reason: {:?}",
+                reason
+            ))));
+        }
+
         let size = n.min(buf.len());
         self.send_stream
             .send_data(Bytes::copy_from_slice(&buf[..size]), false)?;
@@ -133,6 +149,7 @@ impl AsyncWrite for Stream {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.send_stream.reserve_capacity(0);
         self.send_stream.send_data(Bytes::default(), true)?;
         Poll::Ready(Ok(()))
     }

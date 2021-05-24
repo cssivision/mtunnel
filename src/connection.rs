@@ -11,7 +11,7 @@ use tokio::net::TcpStream;
 use tokio::time::{sleep, timeout};
 use tokio_rustls::{rustls::ClientConfig, webpki::DNSName, TlsConnector};
 
-const DEFAULT_CONNECTION_NUM: usize = 3;
+const DEFAULT_CONNECTION_NUM: usize = 1;
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 16; // 16mb
@@ -90,9 +90,11 @@ impl Connection {
     }
 
     async fn send_request(&mut self) -> Result<Stream, h2::Error> {
-        if let Some(send_request) = self.send_request.as_mut() {
+        if let Some(send_request) = self.send_request.take() {
+            let mut send_request = send_request.ready().await?;
             let (response, send_stream) = send_request.send_request(Request::new(()), false)?;
             let recv_stream = response.await?.into_body();
+            self.send_request = Some(send_request);
             Ok(Stream::new(send_stream, recv_stream))
         } else {
             unreachable!();
