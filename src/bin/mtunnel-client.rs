@@ -59,8 +59,6 @@ async fn proxy(socket: TcpStream, h2: Connection) -> io::Result<()> {
     log::debug!("new h2 stream");
     let stream = h2.new_stream().await?;
     log::debug!("proxy to {:?}", stream.stream_id());
-    tokio::spawn(async move {
-        mtunnel::proxy(socket, stream).await;
-    });
+    mtunnel::proxy(socket, stream).await;
     Ok(())
 }
