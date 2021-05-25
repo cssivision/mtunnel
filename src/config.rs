@@ -15,7 +15,6 @@ pub struct Config {
     pub ca_certificate: String,
     pub server_cert: String,
     pub server_key: String,
-    pub conn_nums: usize,
 }
 
 impl Config {
