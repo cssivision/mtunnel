@@ -82,6 +82,7 @@ impl Connection {
             }
         }
 
+        log::debug!("send h2 request");
         self.send_request().await.map_err(|e| {
             self.available = false;
             log::error!("send request error {:?}", e);
