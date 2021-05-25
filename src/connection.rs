@@ -16,6 +16,7 @@ const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 16; // 16mb
 const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024 * 2; // 2mb
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct Multiplexed {
     conns: Vec<Connection>,
@@ -83,11 +84,18 @@ impl Connection {
         }
 
         log::debug!("send h2 request");
-        self.send_request().await.map_err(|e| {
-            self.available = false;
-            log::error!("send request error {:?}", e);
-            other(&e.to_string())
-        })
+        timeout(CONNECT_TIMEOUT, self.send_request())
+            .await
+            .map_err(|e| {
+                self.available = false;
+                log::error!("send request timeout");
+                e
+            })?
+            .map_err(|e| {
+                self.available = false;
+                log::error!("send request error {:?}", e);
+                other(&e.to_string())
+            })
     }
 
     async fn send_request(&mut self) -> Result<Stream, h2::Error> {

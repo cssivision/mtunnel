@@ -1,9 +1,7 @@
 use std::fs::File;
 use std::io::{self, BufReader};
-use std::time::Duration;
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::time::timeout;
 use tokio_rustls::rustls::ClientConfig;
 use tokio_rustls::webpki::DNSNameRef;
 
@@ -11,8 +9,6 @@ use mtunnel::args::parse_args;
 use mtunnel::config::Config;
 use mtunnel::connection::Multiplexed;
 use mtunnel::ALPN_HTTP2;
-
-pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 fn tls_config(cfg: &Config) -> io::Result<ClientConfig> {
     let mut config = ClientConfig::new();
@@ -57,7 +53,7 @@ pub async fn main() -> io::Result<()> {
 
 async fn proxy(socket: TcpStream, h2: &mut Multiplexed) -> io::Result<()> {
     log::debug!("new h2 stream");
-    let stream = timeout(CONNECT_TIMEOUT, h2.new_stream()).await??;
+    let stream = h2.new_stream().await?;
     log::debug!("proxy to {:?}", stream.stream_id());
     tokio::spawn(async move {
         mtunnel::proxy(socket, stream).await;
