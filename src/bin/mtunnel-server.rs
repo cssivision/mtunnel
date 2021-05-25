@@ -46,18 +46,19 @@ pub async fn main() -> io::Result<()> {
     loop {
         if let Ok((stream, addr)) = listener.accept().await {
             log::debug!("accept tcp from {:?}", addr);
-            match tls_acceptor.accept(stream).await {
-                Ok(stream) => {
-                    tokio::spawn(async move {
+            let tls_acceptor = tls_acceptor.clone();
+            tokio::spawn(async move {
+                match tls_acceptor.accept(stream).await {
+                    Ok(stream) => {
                         if let Err(e) = proxy(stream, remote_addr).await {
                             log::error!("proxy h2 connection fail: {:?}", e);
                         }
-                    });
+                    }
+                    Err(e) => {
+                        log::error!("accept stream err {:?}", e);
+                    }
                 }
-                Err(e) => {
-                    log::error!("accept stream err {:?}", e);
-                }
-            }
+            });
         }
     }
 }

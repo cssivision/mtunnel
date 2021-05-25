@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{self, BufReader};
+use std::sync::Arc;
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::rustls::ClientConfig;
@@ -7,7 +8,7 @@ use tokio_rustls::webpki::DNSNameRef;
 
 use mtunnel::args::parse_args;
 use mtunnel::config::Config;
-use mtunnel::connection::Multiplexed;
+use mtunnel::connection::Connection;
 use mtunnel::ALPN_HTTP2;
 
 fn tls_config(cfg: &Config) -> io::Result<ClientConfig> {
@@ -34,15 +35,18 @@ pub async fn main() -> io::Result<()> {
     let domain_name = DNSNameRef::try_from_ascii_str(&config.domain_name)
         .expect("invalid domain name")
         .to_owned();
-    let mut h2 = Multiplexed::new(tls_config, remote_addr, domain_name, config.conn_nums);
+    let h2 = Connection::new(Arc::new(tls_config), remote_addr, domain_name);
 
     loop {
         match listener.accept().await {
             Ok((stream, addr)) => {
                 log::debug!("accept tcp from {:?}", addr);
-                if let Err(e) = proxy(stream, &mut h2).await {
-                    log::error!("proxy error {:?}", e);
-                }
+                let h2 = h2.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = proxy(stream, h2).await {
+                        log::error!("proxy error {:?}", e);
+                    }
+                });
             }
             Err(e) => {
                 log::error!("accept fail: {:?}", e);
@@ -51,12 +55,10 @@ pub async fn main() -> io::Result<()> {
     }
 }
 
-async fn proxy(socket: TcpStream, h2: &mut Multiplexed) -> io::Result<()> {
+async fn proxy(socket: TcpStream, h2: Connection) -> io::Result<()> {
     log::debug!("new h2 stream");
     let stream = h2.new_stream().await?;
     log::debug!("proxy to {:?}", stream.stream_id());
-    tokio::spawn(async move {
-        mtunnel::proxy(socket, stream).await;
-    });
+    mtunnel::proxy(socket, stream).await;
     Ok(())
 }
