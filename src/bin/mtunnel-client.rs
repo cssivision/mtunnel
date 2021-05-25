@@ -43,7 +43,7 @@ pub async fn main() -> io::Result<()> {
     loop {
         match listener.accept().await {
             Ok((stream, addr)) => {
-                log::debug!("accept tcp stream from {:?}", addr);
+                log::debug!("accept tcp from {:?}", addr);
                 if let Err(e) = proxy(stream, &mut h2).await {
                     log::error!("proxy error {:?}", e);
                 }
@@ -58,6 +58,7 @@ pub async fn main() -> io::Result<()> {
 async fn proxy(socket: TcpStream, h2: &mut Multiplexed) -> io::Result<()> {
     log::debug!("new h2 stream");
     let stream = timeout(CONNECT_TIMEOUT, h2.new_stream()).await??;
+    log::debug!("proxy to {:?}", stream.stream_id());
     tokio::spawn(async move {
         mtunnel::proxy(socket, stream).await;
     });

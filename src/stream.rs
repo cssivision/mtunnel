@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use h2::Reason;
+use h2::{Reason, StreamId};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::other;
@@ -19,6 +19,14 @@ impl Stream {
             send_stream: SendStream::new(s1),
             recv_stream: RecvStream::new(s2),
         }
+    }
+
+    pub(crate) fn send_reset(&mut self, reason: Reason) {
+        self.send_stream.send_reset(reason);
+    }
+
+    pub fn stream_id(&self) -> StreamId {
+        self.send_stream.inner.stream_id()
     }
 }
 
@@ -83,7 +91,7 @@ impl SendStream {
             .map_err(|e| other(&e.to_string()))
     }
 
-    pub fn poll_reset(&mut self, cx: &mut Context) -> Poll<io::Result<Reason>> {
+    fn poll_reset(&mut self, cx: &mut Context) -> Poll<io::Result<Reason>> {
         self.inner.poll_reset(cx).map_err(|e| other(&e.to_string()))
     }
 

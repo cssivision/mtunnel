@@ -45,8 +45,7 @@ pub async fn main() -> io::Result<()> {
     let remote_addr = cfg.remote_addr.parse().expect("invalid remote addr");
     loop {
         if let Ok((stream, addr)) = listener.accept().await {
-            log::debug!("accept tcp stream from {:?}", addr);
-
+            log::debug!("accept tcp from {:?}", addr);
             match tls_acceptor.accept(stream).await {
                 Ok(stream) => {
                     tokio::spawn(async move {
@@ -79,7 +78,7 @@ async fn proxy(stream: TlsStream<TcpStream>, addr: SocketAddr) -> io::Result<()>
             .send_response(Response::new(()), false)
             .map_err(|e| other(&e.to_string()))?;
 
-        log::debug!("proxy tcp stream to {}", addr);
+        log::debug!("proxy {:?} to {}", respond.stream_id(), addr);
         tokio::spawn(async move {
             match timeout(CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
                 Ok(stream) => {
@@ -93,6 +92,7 @@ async fn proxy(stream: TlsStream<TcpStream>, addr: SocketAddr) -> io::Result<()>
                     };
                 }
                 Err(e) => {
+                    respond.send_reset(h2::Reason::CANCEL);
                     log::error!("connect to {} err {:?}", &addr, e);
                 }
             }

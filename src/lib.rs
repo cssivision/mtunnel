@@ -32,7 +32,7 @@ pub async fn proxy(mut socket: TcpStream, mut stream: Stream) {
         }
         Err(e) => {
             log::error!("copy_bidirectional err: {:?}", e);
-            stream.send_stream.send_reset(h2::Reason::CANCEL);
+            stream.send_reset(h2::Reason::CANCEL);
         }
     }
 }
