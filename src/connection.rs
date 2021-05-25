@@ -92,10 +92,15 @@ impl Connection {
 
     async fn send_request(&mut self) -> Result<Stream, h2::Error> {
         if let Some(send_request) = self.send_request.take() {
+            log::debug!("waiting for send request ready");
             let mut send_request = send_request.ready().await?;
             let (response, send_stream) = send_request.send_request(Request::new(()), false)?;
+
+            log::debug!("waiting for {:?} ready", response.stream_id());
             let recv_stream = response.await?.into_body();
+
             self.send_request = Some(send_request);
+
             Ok(Stream::new(send_stream, recv_stream))
         } else {
             unreachable!();
