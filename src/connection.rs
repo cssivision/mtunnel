@@ -77,7 +77,7 @@ impl Connection {
                 }
 
                 match ready!(rx.poll_recv(cx)) {
-                    None => return Poll::Ready(()),
+                    None => unreachable!(),
                     Some(req_tx) => {
                         log::debug!("recv new stream request");
                         match h2.send_request(Request::new(()), false) {
