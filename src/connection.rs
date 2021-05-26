@@ -22,6 +22,8 @@ const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 16; // 16mb
 const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024 * 2; // 2mb
 
+type ClientTx = oneshot::Sender<(client::ResponseFuture, h2::SendStream<Bytes>)>;
+
 #[derive(Clone)]
 pub struct Connection(Arc<Inner>);
 
@@ -29,7 +31,7 @@ pub struct Inner {
     tls_config: Arc<ClientConfig>,
     addr: SocketAddr,
     domain_name: DNSName,
-    tx: UnboundedSender<oneshot::Sender<(client::ResponseFuture, h2::SendStream<Bytes>)>>,
+    tx: UnboundedSender<ClientTx>,
 }
 
 impl Connection {
@@ -49,10 +51,7 @@ impl Connection {
         conn
     }
 
-    async fn main_loop(
-        mut self,
-        mut rx: UnboundedReceiver<oneshot::Sender<(client::ResponseFuture, h2::SendStream<Bytes>)>>,
-    ) {
+    async fn main_loop(mut self, mut rx: UnboundedReceiver<ClientTx>) {
         loop {
             let (h2, conn) = self.connect().await;
             self.recv_send_loop(h2, conn, &mut rx).await;
@@ -63,9 +62,7 @@ impl Connection {
         &mut self,
         mut h2: SendRequest<Bytes>,
         mut conn: client::Connection<TlsStream<TcpStream>, Bytes>,
-        rx: &mut UnboundedReceiver<
-            oneshot::Sender<(client::ResponseFuture, h2::SendStream<Bytes>)>,
-        >,
+        rx: &mut UnboundedReceiver<ClientTx>,
     ) {
         poll_fn(|cx| {
             if let Poll::Ready(v) = Pin::new(&mut conn).poll(cx) {
