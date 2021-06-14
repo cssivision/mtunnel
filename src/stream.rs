@@ -137,7 +137,7 @@ impl AsyncWrite for Stream {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.send_stream.reserve_capacity(buf.len());
-        let n = match ready!(self.send_stream.poll_capacity(cx)) {
+        match ready!(self.send_stream.poll_capacity(cx)) {
             Some(v) => v?,
             None => return Poll::Ready(Err(other("poll capacity unexpectedly closed"))),
         };
@@ -150,10 +150,9 @@ impl AsyncWrite for Stream {
             ))));
         }
 
-        let size = n.min(buf.len());
         self.send_stream
-            .send_data(Bytes::copy_from_slice(&buf[..size]), false)?;
-        Poll::Ready(Ok(size))
+            .send_data(Bytes::copy_from_slice(buf), false)?;
+        Poll::Ready(Ok(buf.len()))
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
