@@ -42,19 +42,15 @@ pub async fn main() -> io::Result<()> {
     let config = tls_config(&cfg)?;
     let listener = TcpListener::bind(&cfg.local_addr).await?;
     let tls_acceptor = TlsAcceptor::from(Arc::new(config));
-    let remote_addrs = cfg.remote_socket_addrs();
-    let mut next: usize = 0;
     loop {
         if let Ok((stream, addr)) = listener.accept().await {
             log::debug!("accept tcp from {:?}", addr);
             let tls_acceptor = tls_acceptor.clone();
-            next = next.wrapping_add(1);
-            let current = next % remote_addrs.len();
-            let remote_addr = remote_addrs[current];
+            let remote_addrs = cfg.remote_socket_addrs();
             tokio::spawn(async move {
                 match tls_acceptor.accept(stream).await {
                     Ok(stream) => {
-                        if let Err(e) = proxy(stream, remote_addr).await {
+                        if let Err(e) = proxy(stream, remote_addrs).await {
                             log::error!("proxy h2 connection fail: {:?}", e);
                         }
                     }
@@ -67,7 +63,7 @@ pub async fn main() -> io::Result<()> {
     }
 }
 
-async fn proxy(stream: TlsStream<TcpStream>, addr: SocketAddr) -> io::Result<()> {
+async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Result<()> {
     let mut h2 = server::Builder::new()
         .initial_connection_window_size(DEFAULT_CONN_WINDOW)
         .initial_window_size(DEFAULT_STREAM_WINDOW)
@@ -75,7 +71,12 @@ async fn proxy(stream: TlsStream<TcpStream>, addr: SocketAddr) -> io::Result<()>
         .await
         .map_err(|e| other(&e.to_string()))?;
 
+    let mut next: usize = 0;
+
     while let Some(request) = h2.accept().await {
+        next = next.wrapping_add(1);
+        let current = next % addrs.len();
+        let addr = addrs[current];
         log::debug!("accept h2 stream");
         let (request, mut respond) = request.map_err(|e| other(&e.to_string()))?;
         let recv_stream = request.into_body();
