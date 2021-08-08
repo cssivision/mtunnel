@@ -2,14 +2,13 @@ use std::fs::File;
 use std::io::{self, BufReader};
 use std::sync::Arc;
 
-use tokio::net::{TcpListener, TcpStream};
-use tokio_rustls::rustls::ClientConfig;
-use tokio_rustls::webpki::DNSNameRef;
-
 use mtunnel::args::parse_args;
 use mtunnel::config::Config;
 use mtunnel::connection::Connection;
 use mtunnel::ALPN_HTTP2;
+use tokio::net::{TcpListener, TcpStream};
+use tokio_rustls::rustls::ClientConfig;
+use tokio_rustls::webpki::DNSNameRef;
 
 fn tls_config(cfg: &Config) -> io::Result<ClientConfig> {
     let mut config = ClientConfig::new();

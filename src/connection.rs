@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
 
-use crate::{other, Stream};
 use bytes::Bytes;
 use futures_util::future::poll_fn;
 use h2::client::{self, SendRequest};
@@ -16,6 +15,8 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::time::{sleep, timeout};
 use tokio_rustls::{client::TlsStream, rustls::ClientConfig, webpki::DNSName, TlsConnector};
+
+use crate::{other, Stream};
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
