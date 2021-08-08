@@ -1,5 +1,6 @@
 use std::fs;
 use std::io;
+use std::net::SocketAddr;
 use std::path::Path;
 
 use serde_derive::{Deserialize, Serialize};
@@ -31,7 +32,22 @@ impl Config {
 
             return Ok(config);
         }
-
         Err(other(&format!("{:?} not exist", path.as_ref().to_str())))
+    }
+
+    pub fn remote_socket_addrs(&self) -> Vec<SocketAddr> {
+        self.remote_addr
+            .split(',')
+            .map(|v| v.parse())
+            .filter(|v| {
+                if let Err(e) = v {
+                    log::error!("invalid addr: {}", e);
+                    false
+                } else {
+                    true
+                }
+            })
+            .map(|v| v.unwrap())
+            .collect()
     }
 }
