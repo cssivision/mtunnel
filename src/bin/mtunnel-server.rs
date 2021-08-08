@@ -41,11 +41,12 @@ pub async fn main() -> io::Result<()> {
     let config = tls_config(&cfg)?;
     let listener = TcpListener::bind(&cfg.local_addr).await?;
     let tls_acceptor = TlsAcceptor::from(Arc::new(config));
+    let remote_addrs = cfg.remote_socket_addrs();
     loop {
         if let Ok((stream, addr)) = listener.accept().await {
             log::debug!("accept tcp from {:?}", addr);
             let tls_acceptor = tls_acceptor.clone();
-            let remote_addrs = cfg.remote_socket_addrs();
+            let remote_addrs = remote_addrs.clone();
             tokio::spawn(async move {
                 match tls_acceptor.accept(stream).await {
                     Ok(stream) => {
