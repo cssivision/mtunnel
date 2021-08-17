@@ -155,13 +155,13 @@ impl AsyncWrite for Stream {
         Poll::Ready(Ok(buf.len()))
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.send_stream.reserve_capacity(0);
-        self.send_stream.send_data(Bytes::default(), true)?;
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.send_stream.reserve_capacity(0);
+        self.send_stream.send_data(Bytes::default(), true)?;
         Poll::Ready(Ok(()))
     }
 }
