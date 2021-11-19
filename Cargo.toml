@@ -2,7 +2,7 @@
 name = "mtunnel"
 version = "0.1.0"
 authors = ["misakachen <misakachen@tencent.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 tokio = { version = "1.10", features = ["full"] }
