@@ -32,7 +32,7 @@ fn tls_config(cfg: &Config) -> io::Result<ServerConfig> {
 }
 
 #[tokio::main]
-pub async fn main() -> io::Result<()> {
+async fn main() -> io::Result<()> {
     env_logger::init();
 
     let cfg = parse_args("mtunnel-server").expect("invalid config");
