@@ -43,23 +43,22 @@ async fn main() -> io::Result<()> {
     let tls_acceptor = TlsAcceptor::from(Arc::new(config));
     let remote_addrs = cfg.remote_socket_addrs();
     loop {
-        if let Ok((stream, addr)) = listener.accept().await {
-            log::debug!("accept tcp from {:?}", addr);
-            let tls_acceptor = tls_acceptor.clone();
-            let remote_addrs = remote_addrs.clone();
-            tokio::spawn(async move {
-                match tls_acceptor.accept(stream).await {
-                    Ok(stream) => {
-                        if let Err(e) = proxy(stream, remote_addrs).await {
-                            log::error!("proxy h2 connection fail: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("accept stream err {:?}", e);
+        let (stream, addr) = listener.accept().await?;
+        log::debug!("accept tcp from {:?}", addr);
+        let tls_acceptor = tls_acceptor.clone();
+        let remote_addrs = remote_addrs.clone();
+        tokio::spawn(async move {
+            match tls_acceptor.accept(stream).await {
+                Ok(stream) => {
+                    if let Err(e) = proxy(stream, remote_addrs).await {
+                        log::error!("proxy h2 connection fail: {:?}", e);
                     }
                 }
-            });
-        }
+                Err(e) => {
+                    log::error!("accept stream err {:?}", e);
+                }
+            }
+        });
     }
 }
 
