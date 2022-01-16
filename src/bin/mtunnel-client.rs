@@ -37,20 +37,14 @@ async fn main() -> io::Result<()> {
     let h2 = Connection::new(Arc::new(tls_config), remote_addr, domain_name);
 
     loop {
-        match listener.accept().await {
-            Ok((stream, addr)) => {
-                log::debug!("accept tcp from {:?}", addr);
-                let h2 = h2.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = proxy(stream, h2).await {
-                        log::error!("proxy error {:?}", e);
-                    }
-                });
+        let (stream, addr) = listener.accept().await?;
+        log::debug!("accept tcp from {:?}", addr);
+        let h2 = h2.clone();
+        tokio::spawn(async move {
+            if let Err(e) = proxy(stream, h2).await {
+                log::error!("proxy error {:?}", e);
             }
-            Err(e) => {
-                log::error!("accept fail: {:?}", e);
-            }
-        }
+        });
     }
 }
 
