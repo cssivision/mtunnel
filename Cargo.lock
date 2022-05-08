@@ -276,6 +276,7 @@ dependencies = [
  "h2",
  "http",
  "log",
+ "pin-project-lite",
  "serde",
  "serde_derive",
  "serde_json",
