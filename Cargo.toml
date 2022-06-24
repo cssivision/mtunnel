@@ -5,7 +5,7 @@ authors = ["misakachen <misakachen@tencent.com>"]
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1.10", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 h2 = "0.3"
 tokio-rustls = "0.22"
 serde = "1.0"

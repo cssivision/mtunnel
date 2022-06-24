@@ -17,6 +17,7 @@ use tokio_rustls::rustls::{Certificate, NoClientAuth, PrivateKey, ServerConfig};
 use tokio_rustls::{server::TlsStream, TlsAcceptor};
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+const HANKSHAKE_TIMEOUT: Duration = Duration::from_secs(1);
 const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 8; // 8mb
 const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024; // 1mb
 
@@ -63,12 +64,16 @@ async fn main() -> io::Result<()> {
 }
 
 async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Result<()> {
-    let mut h2 = server::Builder::new()
-        .initial_connection_window_size(DEFAULT_CONN_WINDOW)
-        .initial_window_size(DEFAULT_STREAM_WINDOW)
-        .handshake(stream)
-        .await
-        .map_err(|e| other(&e.to_string()))?;
+    let mut h2 = timeout(
+        HANKSHAKE_TIMEOUT,
+        server::Builder::new()
+            .initial_connection_window_size(DEFAULT_CONN_WINDOW)
+            .initial_window_size(DEFAULT_STREAM_WINDOW)
+            .handshake(stream),
+    )
+    .await
+    .map_err(|e| other(&e.to_string()))?
+    .map_err(|e| other(&e.to_string()))?;
 
     let mut next: usize = 0;
 
