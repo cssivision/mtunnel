@@ -14,7 +14,11 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::time::{sleep, timeout};
-use tokio_rustls::{client::TlsStream, rustls::ClientConfig, webpki::DNSName, TlsConnector};
+use tokio_rustls::{
+    client::TlsStream,
+    rustls::{ClientConfig, ServerName},
+    TlsConnector,
+};
 
 use crate::{other, Stream};
 
@@ -31,7 +35,7 @@ pub struct Connection(Arc<Inner>);
 pub struct Inner {
     tls_config: Arc<ClientConfig>,
     addr: SocketAddr,
-    domain_name: DNSName,
+    server_name: ServerName,
     tx: UnboundedSender<ClientTx>,
 }
 
@@ -39,13 +43,13 @@ impl Connection {
     pub fn new(
         tls_config: Arc<ClientConfig>,
         addr: SocketAddr,
-        domain_name: DNSName,
+        server_name: ServerName,
     ) -> Connection {
         let (tx, rx) = unbounded_channel();
         let conn = Connection(Arc::new(Inner {
             tls_config,
             addr,
-            domain_name,
+            server_name,
             tx,
         }));
         tokio::spawn(conn.clone().main_loop(rx));
@@ -129,7 +133,7 @@ impl Connection {
                     timeout(DEFAULT_CONNECT_TIMEOUT, TcpStream::connect(self.0.addr)).await??;
                 let _ = stream.set_nodelay(true);
                 let tls_stream = tls_connector
-                    .connect(self.0.domain_name.as_ref(), stream)
+                    .connect(self.0.server_name.clone(), stream)
                     .await?;
                 client::Builder::new()
                     .initial_connection_window_size(DEFAULT_CONN_WINDOW)

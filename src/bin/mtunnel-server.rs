@@ -8,12 +8,11 @@ use h2::server;
 use http::Response;
 use mtunnel::args::parse_args;
 use mtunnel::config::Config;
-use mtunnel::ALPN_HTTP2;
 use mtunnel::{other, Stream};
+use rustls_pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
-use tokio_rustls::rustls::internal::pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
-use tokio_rustls::rustls::{Certificate, NoClientAuth, PrivateKey, ServerConfig};
+use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::{server::TlsStream, TlsAcceptor};
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -24,11 +23,11 @@ const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024; // 1mb
 fn tls_config(cfg: &Config) -> io::Result<ServerConfig> {
     let key = load_keys(&cfg.server_key)?;
     let certs = load_certs(&cfg.server_cert)?;
-    let mut config = ServerConfig::new(NoClientAuth::new());
-    config
-        .set_single_cert(certs, key)
+    let config = ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(certs, key)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
-    config.set_protocols(&[ALPN_HTTP2.to_vec()]);
     Ok(config)
 }
 
@@ -114,15 +113,22 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
 fn load_certs(path: &str) -> io::Result<Vec<Certificate>> {
     certs(&mut BufReader::new(File::open(path)?))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))
+        .map(|mut certs| certs.drain(..).map(Certificate).collect())
 }
 
 fn load_keys(path: &str) -> io::Result<PrivateKey> {
-    if let Ok(mut keys) = pkcs8_private_keys(&mut BufReader::new(File::open(path)?)) {
+    if let Ok(mut keys) = pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
+        .map(|mut keys| keys.drain(..).map(PrivateKey).collect::<Vec<PrivateKey>>())
+    {
         if !keys.is_empty() {
             return Ok(keys.remove(0));
         }
     }
-    if let Ok(mut keys) = rsa_private_keys(&mut BufReader::new(File::open(path)?)) {
+    if let Ok(mut keys) = rsa_private_keys(&mut BufReader::new(File::open(path)?))
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
+        .map(|mut keys| keys.drain(..).map(PrivateKey).collect::<Vec<PrivateKey>>())
+    {
         if !keys.is_empty() {
             return Ok(keys.remove(0));
         }

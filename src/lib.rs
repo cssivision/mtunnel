@@ -25,7 +25,6 @@ mod stream;
 
 pub use stream::Stream;
 
-pub const ALPN_HTTP2: &[u8] = b"h2";
 const DEFAULT_VISITED_GAP: Duration = Duration::from_secs(3);
 const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
