@@ -38,9 +38,8 @@ async fn main() -> io::Result<()> {
     let tls_config = tls_config(&config)?;
     let listener = TcpListener::bind(&config.local_addr).await?;
     let remote_addr = config.remote_addr.parse().expect("invalid remote addr");
-    let domain_name = ServerName::try_from(config.domain_name.as_str())
-        .expect("invalid domain name")
-        .to_owned();
+    let domain_name =
+        ServerName::try_from(config.domain_name.as_str()).expect("invalid domain name");
     let h2 = Connection::new(Arc::new(tls_config), remote_addr, domain_name);
 
     loop {
