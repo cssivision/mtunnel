@@ -1,11 +1,13 @@
 use std::fs::File;
 use std::io::{self, BufReader};
 use std::sync::Arc;
+use std::time::Duration;
 
 use mtunnel::args::parse_args;
 use mtunnel::config::Config;
 use mtunnel::connection::Connection;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::time::timeout;
 use tokio_rustls::rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName};
 use tokio_rustls::webpki;
 
@@ -56,7 +58,7 @@ async fn main() -> io::Result<()> {
 
 async fn proxy(socket: TcpStream, h2: Connection) -> io::Result<()> {
     log::debug!("new h2 stream");
-    let stream = h2.new_stream().await?;
+    let stream = timeout(Duration::from_secs(3), h2.new_stream()).await??;
     log::debug!("proxy to {:?}", stream.stream_id());
     mtunnel::proxy(socket, stream).await;
     Ok(())

@@ -146,7 +146,7 @@ impl Connection {
             match fut.await {
                 Ok(v) => return v,
                 Err(e) => {
-                    log::trace!("reconnect err: {:?} fail: {:?}", self.0.addr, e);
+                    log::error!("reconnect err: {:?} fail: {:?}", self.0.addr, e);
                     let delay = DELAY_MS.get(sleeps as usize).unwrap_or(&1000);
                     sleeps += 1;
                     sleep(Duration::from_millis(*delay)).await;
