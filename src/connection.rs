@@ -11,7 +11,7 @@ use futures_util::future::poll_fn;
 use h2::client::{self, SendRequest};
 use http::Request;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio::time::{sleep, timeout};
 use tokio_rustls::{
@@ -36,7 +36,7 @@ pub struct Inner {
     tls_config: Arc<ClientConfig>,
     addr: SocketAddr,
     server_name: ServerName,
-    tx: UnboundedSender<ClientTx>,
+    tx: Sender<ClientTx>,
 }
 
 impl Connection {
@@ -45,7 +45,7 @@ impl Connection {
         addr: SocketAddr,
         server_name: ServerName,
     ) -> Connection {
-        let (tx, rx) = unbounded_channel();
+        let (tx, rx) = channel(100);
         let conn = Connection(Arc::new(Inner {
             tls_config,
             addr,
@@ -56,7 +56,7 @@ impl Connection {
         conn
     }
 
-    async fn main_loop(mut self, mut rx: UnboundedReceiver<ClientTx>) {
+    async fn main_loop(mut self, mut rx: Receiver<ClientTx>) {
         loop {
             let (h2, conn) = self.connect().await;
             self.recv_send_loop(h2, conn, &mut rx).await;
@@ -67,7 +67,7 @@ impl Connection {
         &mut self,
         mut h2: SendRequest<Bytes>,
         mut conn: client::Connection<TlsStream<TcpStream>, Bytes>,
-        rx: &mut UnboundedReceiver<ClientTx>,
+        rx: &mut Receiver<ClientTx>,
     ) {
         poll_fn(|cx| {
             if let Poll::Ready(v) = Pin::new(&mut conn).poll(cx) {
@@ -106,6 +106,7 @@ impl Connection {
         self.0
             .tx
             .send(tx)
+            .await
             .map_err(|e| other(&format!("new stream request err: {}", e)))?;
         let (response, send_stream) = rx
             .await
