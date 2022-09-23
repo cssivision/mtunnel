@@ -1,13 +1,12 @@
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Poll;
+use std::task::{ready, Poll};
 use std::time::Duration;
 
 use bytes::Bytes;
-use futures_util::future::poll_fn;
 use h2::client::{self, SendRequest};
 use http::Request;
 use tokio::net::TcpStream;

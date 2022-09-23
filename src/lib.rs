@@ -9,15 +9,6 @@ use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, Duration, Instant, Sleep};
 
-macro_rules! ready {
-    ($e:expr $(,)?) => {
-        match $e {
-            std::task::Poll::Ready(t) => t,
-            std::task::Poll::Pending => return std::task::Poll::Pending,
-        }
-    };
-}
-
 pub mod args;
 pub mod config;
 pub mod connection;
