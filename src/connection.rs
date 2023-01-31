@@ -106,14 +106,14 @@ impl Connection {
             .tx
             .send(tx)
             .await
-            .map_err(|e| other(&format!("new stream request err: {}", e)))?;
+            .map_err(|e| other(&format!("new stream request err: {e}")))?;
         let (response, send_stream) = rx
             .await
-            .map_err(|e| other(&format!("new stream response err: {}", e)))?;
+            .map_err(|e| other(&format!("new stream response err: {e}")))?;
 
         let recv_stream = response
             .await
-            .map_err(|e| other(&format!("recv stream err: {}", e)))?
+            .map_err(|e| other(&format!("recv stream err: {e}")))?
             .into_body();
         Ok(Stream::new(send_stream, recv_stream))
     }

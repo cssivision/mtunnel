@@ -144,10 +144,7 @@ impl AsyncWrite for Stream {
 
         if let Poll::Ready(reason) = self.send_stream.poll_reset(cx)? {
             log::debug!("stream received RST_STREAM: {:?}", reason);
-            return Poll::Ready(Err(other(&format!(
-                "stream reset for reason: {:?}",
-                reason
-            ))));
+            return Poll::Ready(Err(other(&format!("stream reset for reason: {reason:?}",))));
         }
 
         self.send_stream
