@@ -6,21 +6,21 @@ use std::time::Duration;
 
 use h2::server;
 use http::Response;
-use mtunnel::args::parse_args;
-use mtunnel::config::Config;
-use mtunnel::{other, Stream};
 use rustls_pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::{server::TlsStream, TlsAcceptor};
 
+use crate::config;
+use crate::{other, Stream};
+
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const HANKSHAKE_TIMEOUT: Duration = Duration::from_secs(1);
 const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 8; // 8mb
 const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024; // 1mb
 
-fn tls_config(cfg: &Config) -> io::Result<ServerConfig> {
+fn tls_config(cfg: &config::Server) -> io::Result<ServerConfig> {
     let key = load_keys(&cfg.server_key)?;
     let certs = load_certs(&cfg.server_cert)?;
     let config = ServerConfig::builder()
@@ -31,13 +31,7 @@ fn tls_config(cfg: &Config) -> io::Result<ServerConfig> {
     Ok(config)
 }
 
-#[tokio::main]
-async fn main() -> io::Result<()> {
-    env_logger::init();
-
-    let cfg = parse_args("mtunnel-server").expect("invalid config");
-    log::info!("{}", serde_json::to_string_pretty(&cfg).unwrap());
-
+pub async fn run(cfg: config::Server) -> io::Result<()> {
     let config = tls_config(&cfg)?;
     let listener = TcpListener::bind(&cfg.local_addr).await?;
     let tls_acceptor = TlsAcceptor::from(Arc::new(config));
@@ -93,7 +87,7 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
                 Ok(stream) => {
                     match stream {
                         Ok(stream) => {
-                            mtunnel::proxy(stream, Stream::new(send_stream, recv_stream)).await;
+                            crate::proxy(stream, Stream::new(send_stream, recv_stream)).await;
                         }
                         Err(e) => {
                             log::error!("connect to {} err {:?}", &addr, e);

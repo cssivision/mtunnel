@@ -10,8 +10,10 @@ use tokio::net::TcpStream;
 use tokio::time::{sleep, Duration, Instant, Sleep};
 
 pub mod args;
+pub mod client;
 pub mod config;
 pub mod connection;
+pub mod server;
 mod stream;
 
 pub use stream::Stream;

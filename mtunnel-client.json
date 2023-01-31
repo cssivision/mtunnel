@@ -1,6 +1,0 @@
-{
-    "local_addr": "127.0.0.1:8080",
-    "remote_addr": "127.0.0.1:8081",
-    "domain_name": "mydomain.com",
-    "ca_certificate": "./tls_config/rootCA.crt"
-}

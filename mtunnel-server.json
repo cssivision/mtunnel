@@ -1,6 +1,0 @@
-{
-    "local_addr": "127.0.0.1:8081",
-    "remote_addr": "127.0.0.1:8082",
-    "server_cert": "./tls_config/mydomain.com.crt",
-    "server_key": "./tls_config/mydomain.com.key"
-}
