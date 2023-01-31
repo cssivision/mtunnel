@@ -9,7 +9,7 @@ use tokio::signal;
 async fn main() -> io::Result<()> {
     env_logger::init();
 
-    let cfg = parse_args("qtunnel").expect("invalid config");
+    let cfg = parse_args("mtunnel").expect("invalid config");
     log::info!("config: \n{}", toml::ser::to_string_pretty(&cfg).unwrap());
 
     if let Some(cfg) = cfg.client {
