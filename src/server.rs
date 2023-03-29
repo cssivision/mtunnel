@@ -19,6 +19,7 @@ pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const HANKSHAKE_TIMEOUT: Duration = Duration::from_secs(1);
 const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 8; // 8mb
 const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024; // 1mb
+const ACCEPT_TLS_TIMEOUT: Duration = Duration::from_secs(3);
 
 fn tls_config(cfg: &config::Server) -> io::Result<ServerConfig> {
     let key = load_keys(&cfg.server_key)?;
@@ -42,14 +43,19 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
         let tls_acceptor = tls_acceptor.clone();
         let remote_addrs = remote_addrs.clone();
         tokio::spawn(async move {
-            match tls_acceptor.accept(stream).await {
-                Ok(stream) => {
-                    if let Err(e) = proxy(stream, remote_addrs).await {
-                        log::error!("proxy h2 connection fail: {:?}", e);
+            match timeout(ACCEPT_TLS_TIMEOUT, tls_acceptor.accept(stream)).await {
+                Ok(stream) => match stream {
+                    Ok(stream) => {
+                        if let Err(e) = proxy(stream, remote_addrs).await {
+                            log::error!("proxy h2 connection fail: {:?}", e);
+                        }
                     }
-                }
+                    Err(e) => {
+                        log::error!("accept stream err {:?}", e);
+                    }
+                },
                 Err(e) => {
-                    log::error!("accept stream err {:?}", e);
+                    log::error!("accept stream timeout err {:?}", e);
                 }
             }
         });
