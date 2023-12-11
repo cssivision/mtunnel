@@ -9,15 +9,12 @@ use std::time::Duration;
 use bytes::Bytes;
 use h2::client::{self, SendRequest};
 use http::Request;
+use rustls::pki_types::ServerName;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio::time::{sleep, timeout};
-use tokio_rustls::{
-    client::TlsStream,
-    rustls::{ClientConfig, ServerName},
-    TlsConnector,
-};
+use tokio_rustls::{client::TlsStream, TlsConnector};
 
 use crate::{other, Stream};
 
@@ -32,17 +29,17 @@ type ClientTx = oneshot::Sender<(client::ResponseFuture, h2::SendStream<Bytes>)>
 pub struct Connection(Arc<Inner>);
 
 pub struct Inner {
-    tls_config: Arc<ClientConfig>,
+    tls_config: Arc<rustls::ClientConfig>,
     addr: SocketAddr,
-    server_name: ServerName,
+    server_name: ServerName<'static>,
     tx: Sender<ClientTx>,
 }
 
 impl Connection {
     pub fn new(
-        tls_config: Arc<ClientConfig>,
+        tls_config: Arc<rustls::ClientConfig>,
         addr: SocketAddr,
-        server_name: ServerName,
+        server_name: ServerName<'static>,
     ) -> Connection {
         let (tx, rx) = channel(100);
         let conn = Connection(Arc::new(Inner {
