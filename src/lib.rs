@@ -3,11 +3,12 @@ use std::io;
 use std::ops::{Add, Sub};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
+use awak::net::TcpStream;
+use awak::time::{delay_for, Delay};
+use awak::util::copy_bidirectional;
 use pin_project_lite::pin_project;
-use tokio::io::copy_bidirectional;
-use tokio::net::TcpStream;
-use tokio::time::{sleep, Duration, Instant, Sleep};
 
 pub mod args;
 pub mod client;
@@ -53,7 +54,7 @@ pin_project! {
         #[pin]
         inner: S,
         #[pin]
-        sleep: Sleep,
+        sleep: Delay,
         idle_timeout: Duration,
         last_visited: Instant,
     }
@@ -61,7 +62,7 @@ pin_project! {
 
 impl<S: Future> IdleTimeout<S> {
     pub fn new(inner: S, idle_timeout: Duration) -> Self {
-        let sleep = sleep(idle_timeout);
+        let sleep = delay_for(idle_timeout);
 
         Self {
             inner,

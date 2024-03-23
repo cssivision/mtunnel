@@ -4,13 +4,18 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use awak::net::{TcpListener, TcpStream};
+use awak::time::timeout;
+use futures_rustls::{
+    rustls,
+    rustls::pki_types::{CertificateDer, PrivateKeyDer},
+    server::TlsStream,
+    TlsAcceptor,
+};
 use h2::server;
 use http::Response;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls_pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::time::timeout;
-use tokio_rustls::{server::TlsStream, TlsAcceptor};
+use tokio_util::compat::*;
 
 use crate::config;
 use crate::{other, Stream};
@@ -41,7 +46,7 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
         log::debug!("accept tcp from {:?}", addr);
         let tls_acceptor = tls_acceptor.clone();
         let remote_addrs = remote_addrs.clone();
-        tokio::spawn(async move {
+        awak::spawn(async move {
             match timeout(ACCEPT_TLS_TIMEOUT, tls_acceptor.accept(stream)).await {
                 Ok(stream) => match stream {
                     Ok(stream) => {
@@ -57,7 +62,8 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
                     log::error!("accept stream timeout err {:?}", e);
                 }
             }
-        });
+        })
+        .detach();
     }
 }
 
@@ -67,7 +73,7 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
         server::Builder::new()
             .initial_connection_window_size(DEFAULT_CONN_WINDOW)
             .initial_window_size(DEFAULT_STREAM_WINDOW)
-            .handshake(stream),
+            .handshake(stream.compat()),
     )
     .await
     .map_err(|e| other(&e.to_string()))?
@@ -87,7 +93,7 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
             .map_err(|e| other(&e.to_string()))?;
 
         log::debug!("proxy {:?} to {}", respond.stream_id(), addr);
-        tokio::spawn(async move {
+        awak::spawn(async move {
             match timeout(CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
                 Ok(stream) => {
                     match stream {
@@ -104,7 +110,8 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
                     log::error!("connect to {} err {:?}", &addr, e);
                 }
             }
-        });
+        })
+        .detach();
     }
     Ok(())
 }

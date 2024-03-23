@@ -3,9 +3,9 @@ use std::io::{self, BufReader};
 use std::sync::Arc;
 use std::time::Duration;
 
-use rustls::pki_types::ServerName;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::time::timeout;
+use awak::net::{TcpListener, TcpStream};
+use awak::time::timeout;
+use futures_rustls::{rustls, rustls::pki_types::ServerName};
 
 use crate::config;
 use crate::connection::Connection;
@@ -35,15 +35,16 @@ pub async fn run(config: config::Client) -> io::Result<()> {
         let (stream, addr) = listener.accept().await?;
         log::debug!("accept tcp from {:?}", addr);
         let h2 = h2.clone();
-        tokio::spawn(async move {
+        awak::spawn(async move {
             if let Err(e) = proxy(stream, h2).await {
                 log::error!("proxy error {:?}", e);
             }
-        });
+        })
+        .detach();
     }
 }
 
-async fn proxy(socket: TcpStream, h2: Connection) -> io::Result<()> {
+async fn proxy(socket: TcpStream, mut h2: Connection) -> io::Result<()> {
     log::debug!("new h2 stream");
     let stream = timeout(Duration::from_secs(3), h2.new_stream()).await??;
     log::debug!("proxy to {:?}", stream.stream_id());

@@ -3,8 +3,8 @@ use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 use bytes::Bytes;
+use futures_io::{AsyncRead, AsyncWrite};
 use h2::{Reason, StreamId};
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::other;
 
@@ -104,15 +104,14 @@ impl AsyncRead for Stream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
         loop {
             if !self.recv_stream.buf.is_empty() {
-                let pos = self.recv_stream.buf.len().min(buf.remaining());
-                buf.put_slice(&self.recv_stream.buf.split_to(pos));
-                return Poll::Ready(Ok(()));
+                let n = self.recv_stream.buf.len().min(buf.len());
+                buf[..n].copy_from_slice(&self.recv_stream.buf.split_to(n));
+                return Poll::Ready(Ok(n));
             }
-
             if !self.recv_stream.read_closed {
                 if let Some(data) = ready!(self.recv_stream.poll_data(cx)) {
                     let data = data?;
@@ -122,9 +121,8 @@ impl AsyncRead for Stream {
                     self.recv_stream.read_closed = self.recv_stream.inner.is_end_stream();
                 }
             }
-
             if self.recv_stream.read_closed && self.recv_stream.buf.is_empty() {
-                return Poll::Ready(Ok(()));
+                return Poll::Ready(Ok(0));
             }
         }
     }
@@ -156,7 +154,7 @@ impl AsyncWrite for Stream {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.send_stream.reserve_capacity(0);
         self.send_stream.send_data(Bytes::default(), true)?;
         Poll::Ready(Ok(()))
