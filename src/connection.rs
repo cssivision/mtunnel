@@ -10,9 +10,7 @@ use awak::net::TcpStream;
 use awak::time::{delay_for, timeout};
 use bytes::Bytes;
 use futures_channel::{mpsc, oneshot};
-use futures_rustls::{
-    self, client::TlsStream, rustls, rustls::pki_types::ServerName, TlsConnector,
-};
+use futures_rustls::{client::TlsStream, rustls, rustls::pki_types::ServerName, TlsConnector};
 use futures_util::sink::SinkExt;
 use futures_util::stream::Stream;
 use h2::client::{self, SendRequest};
