@@ -1,14 +1,8 @@
-use std::future::Future;
 use std::io;
-use std::ops::{Add, Sub};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use awak::net::TcpStream;
-use awak::time::{delay_for, Delay};
-use awak::util::copy_bidirectional;
-use pin_project_lite::pin_project;
+use awak::util::{copy_bidirectional, IdleTimeout};
 
 pub mod args;
 pub mod client;
@@ -19,7 +13,7 @@ mod stream;
 
 pub use stream::Stream;
 
-const DEFAULT_VISITED_GAP: Duration = Duration::from_secs(3);
+const DEFAULT_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 pub fn other(desc: &str) -> io::Error {
@@ -30,6 +24,7 @@ pub async fn proxy(mut socket: TcpStream, mut stream: Stream) {
     match IdleTimeout::new(
         copy_bidirectional(&mut socket, &mut stream),
         DEFAULT_IDLE_TIMEOUT,
+        DEFAULT_CHECK_INTERVAL,
     )
     .await
     {
@@ -44,54 +39,6 @@ pub async fn proxy(mut socket: TcpStream, mut stream: Stream) {
         },
         Err(_) => {
             log::error!("copy_bidirectional idle timeout");
-        }
-    }
-}
-
-pin_project! {
-    /// A future with timeout time set
-    pub struct IdleTimeout<S: Future> {
-        #[pin]
-        inner: S,
-        #[pin]
-        sleep: Delay,
-        idle_timeout: Duration,
-        last_visited: Instant,
-    }
-}
-
-impl<S: Future> IdleTimeout<S> {
-    pub fn new(inner: S, idle_timeout: Duration) -> Self {
-        let sleep = delay_for(idle_timeout);
-
-        Self {
-            inner,
-            sleep,
-            idle_timeout,
-            last_visited: Instant::now(),
-        }
-    }
-}
-
-impl<S: Future> Future for IdleTimeout<S> {
-    type Output = io::Result<S::Output>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
-
-        match this.inner.poll(cx) {
-            Poll::Ready(v) => Poll::Ready(Ok(v)),
-            Poll::Pending => match Pin::new(&mut this.sleep).poll(cx) {
-                Poll::Ready(_) => Poll::Ready(Err(io::ErrorKind::TimedOut.into())),
-                Poll::Pending => {
-                    let now = Instant::now();
-                    if now.sub(*this.last_visited) >= DEFAULT_VISITED_GAP {
-                        *this.last_visited = now;
-                        this.sleep.reset(now.add(*this.idle_timeout));
-                    }
-                    Poll::Pending
-                }
-            },
         }
     }
 }
