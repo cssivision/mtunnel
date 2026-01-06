@@ -3,7 +3,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::path::Path;
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::other;
 
