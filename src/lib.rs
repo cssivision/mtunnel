@@ -1,4 +1,3 @@
-use std::io;
 use std::time::Duration;
 
 use awak::net::TcpStream;
@@ -15,10 +14,6 @@ pub use stream::Stream;
 
 const DEFAULT_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-
-pub fn other(desc: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, desc)
-}
 
 pub async fn proxy(mut socket: TcpStream, mut stream: Stream) {
     match IdleTimeout::new(

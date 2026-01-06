@@ -17,8 +17,6 @@ use h2::client::{self, SendRequest};
 use http::Request;
 use tokio_util::compat::*;
 
-use crate::other;
-
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const DELAY_MS: &[u64] = &[50, 75, 100, 250, 500, 750, 1000];
 const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024 * 16; // 16mb
@@ -105,14 +103,14 @@ impl Connection {
             .clone()
             .send(tx)
             .await
-            .map_err(|e| other(&format!("new stream request err: {e}")))?;
+            .map_err(|e| io::Error::other(format!("new stream request err: {e}")))?;
         let (response, send_stream) = rx
             .await
-            .map_err(|e| other(&format!("new stream response err: {e}")))?;
+            .map_err(|e| io::Error::other(format!("new stream response err: {e}")))?;
 
         let recv_stream = response
             .await
-            .map_err(|e| other(&format!("recv stream err: {e}")))?
+            .map_err(|e| io::Error::other(format!("recv stream err: {e}")))?
             .into_body();
         Ok(crate::Stream::new(send_stream, recv_stream))
     }
@@ -139,7 +137,7 @@ impl Connection {
                     .initial_window_size(DEFAULT_STREAM_WINDOW)
                     .handshake(tls_stream.compat())
                     .await
-                    .map_err(|e| other(&e.to_string()))
+                    .map_err(io::Error::other)
             };
 
             match fut.await {

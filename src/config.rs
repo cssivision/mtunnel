@@ -5,8 +5,6 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::other;
-
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct Config {
@@ -58,12 +56,15 @@ impl Config {
                 Ok(c) => c,
                 Err(e) => {
                     log::error!("{}", e);
-                    return Err(io::Error::new(io::ErrorKind::Other, e));
+                    return Err(io::Error::other(e));
                 }
             };
 
             return Ok(config);
         }
-        Err(other(&format!("{:?} not exist", path.as_ref().to_str())))
+        Err(io::Error::other(format!(
+            "{:?} not exist",
+            path.as_ref().to_str()
+        )))
     }
 }

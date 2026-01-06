@@ -18,7 +18,7 @@ use rustls_pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
 use tokio_util::compat::*;
 
 use crate::config;
-use crate::{other, Stream};
+use crate::Stream;
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const HANKSHAKE_TIMEOUT: Duration = Duration::from_secs(1);
@@ -76,8 +76,8 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
             .handshake(stream.compat()),
     )
     .await
-    .map_err(|e| other(&e.to_string()))?
-    .map_err(|e| other(&e.to_string()))?;
+    .map_err(io::Error::other)?
+    .map_err(io::Error::other)?;
 
     let mut next: usize = 0;
 
@@ -86,11 +86,11 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
         let current = next % addrs.len();
         let addr = addrs[current];
         log::debug!("accept h2 stream");
-        let (request, mut respond) = request.map_err(|e| other(&e.to_string()))?;
+        let (request, mut respond) = request.map_err(io::Error::other)?;
         let recv_stream = request.into_body();
         let send_stream = respond
             .send_response(Response::new(()), false)
-            .map_err(|e| other(&e.to_string()))?;
+            .map_err(io::Error::other)?;
 
         log::debug!("proxy {:?} to {}", respond.stream_id(), addr);
         awak::spawn(async move {

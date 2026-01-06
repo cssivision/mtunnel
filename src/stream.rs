@@ -6,8 +6,6 @@ use bytes::Bytes;
 use futures_io::{AsyncRead, AsyncWrite};
 use h2::{Reason, StreamId};
 
-use crate::other;
-
 pub struct Stream {
     pub send_stream: SendStream,
     pub recv_stream: RecvStream,
@@ -48,14 +46,14 @@ impl RecvStream {
     pub fn poll_data(&mut self, cx: &mut Context<'_>) -> Poll<Option<io::Result<Bytes>>> {
         self.inner
             .poll_data(cx)
-            .map_err(|e| other(&format!("poll_data err: {:?}", e.to_string())))
+            .map_err(|e| io::Error::other(format!("poll_data err: {:?}", e.to_string())))
     }
 
     fn release_capacity(&mut self, size: usize) -> io::Result<()> {
         self.inner
             .flow_control()
             .release_capacity(size)
-            .map_err(|e| other(&e.to_string()))
+            .map_err(io::Error::other)
     }
 }
 
@@ -70,7 +68,7 @@ impl SendStream {
 
     fn send_data(&mut self, data: Bytes, end_of_stream: bool) -> io::Result<()> {
         self.inner.send_data(data, end_of_stream).map_err(|e| {
-            other(&format!(
+            io::Error::other(format!(
                 "poll_write err: {:?}, end_of_stream {}",
                 e.to_string(),
                 end_of_stream
@@ -86,13 +84,11 @@ impl SendStream {
         if self.inner.capacity() > 0 {
             return Poll::Ready(Some(Ok(self.inner.capacity())));
         }
-        self.inner
-            .poll_capacity(cx)
-            .map_err(|e| other(&e.to_string()))
+        self.inner.poll_capacity(cx).map_err(io::Error::other)
     }
 
     fn poll_reset(&mut self, cx: &mut Context) -> Poll<io::Result<Reason>> {
-        self.inner.poll_reset(cx).map_err(|e| other(&e.to_string()))
+        self.inner.poll_reset(cx).map_err(io::Error::other)
     }
 
     pub(crate) fn send_reset(&mut self, reason: Reason) {
@@ -137,12 +133,14 @@ impl AsyncWrite for Stream {
         self.send_stream.reserve_capacity(buf.len());
         match ready!(self.send_stream.poll_capacity(cx)) {
             Some(v) => v?,
-            None => return Poll::Ready(Err(other("poll capacity unexpectedly closed"))),
+            None => return Poll::Ready(Err(io::Error::other("poll capacity unexpectedly closed"))),
         };
 
         if let Poll::Ready(reason) = self.send_stream.poll_reset(cx)? {
             log::debug!("stream received RST_STREAM: {:?}", reason);
-            return Poll::Ready(Err(other(&format!("stream reset for reason: {reason:?}",))));
+            return Poll::Ready(Err(io::Error::other(format!(
+                "stream reset for reason: {reason:?}",
+            ))));
         }
 
         self.send_stream
