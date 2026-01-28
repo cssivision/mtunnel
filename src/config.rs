@@ -5,26 +5,23 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub client: Option<Client>,
     pub server: Option<Server>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Client {
-    pub local_addr: String,
+    pub local_addr: SocketAddr,
     pub remote_addr: String,
     pub domain_name: String,
     pub ca_certificate: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Server {
-    pub local_addr: String,
+    pub local_addr: SocketAddr,
     pub remote_addr: String,
     pub server_cert: String,
     pub server_key: String,
