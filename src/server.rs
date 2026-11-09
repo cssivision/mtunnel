@@ -101,13 +101,13 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
                             crate::proxy(stream, Stream::new(send_stream, recv_stream)).await;
                         }
                         Err(e) => {
-                            log::error!("connect to {} err {:?}", &addr, e);
+                            log::error!("connect to {} err {:?}", addr, e);
                         }
                     };
                 }
                 Err(e) => {
                     respond.send_reset(h2::Reason::CANCEL);
-                    log::error!("connect to {} err {:?}", &addr, e);
+                    log::error!("connect to {} err {:?}", addr, e);
                 }
             }
         })

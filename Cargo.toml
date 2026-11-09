@@ -20,4 +20,4 @@ futures-rustls = "0.26"
 futures-io = "0.3"
 futures-channel = { version = "0.3", features = ["sink"] }
 tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
-toml = "0.9"
+toml = "1"
