@@ -46,6 +46,7 @@ pub async fn run(config: config::Client) -> io::Result<()> {
 }
 
 async fn proxy(socket: TcpStream, mut h2: Connection, buffer_size: usize) -> io::Result<()> {
+    let _ = socket.set_nodelay(true);
     log::debug!("new h2 stream");
     let stream = timeout(Duration::from_secs(3), h2.new_stream()).await??;
     log::debug!("proxy to {:?}", stream.stream_id());

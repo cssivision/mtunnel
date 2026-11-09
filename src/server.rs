@@ -44,6 +44,7 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
     let buffer_size = crate::copy_buffer_size(cfg.buffer_size);
     loop {
         let (stream, addr) = listener.accept().await?;
+        let _ = stream.set_nodelay(true);
         log::debug!("accept tcp from {:?}", addr);
         let tls_acceptor = tls_acceptor.clone();
         let remote_addrs = remote_addrs.clone();
@@ -103,6 +104,7 @@ async fn proxy(
                 Ok(stream) => {
                     match stream {
                         Ok(stream) => {
+                            let _ = stream.set_nodelay(true);
                             crate::proxy(
                                 stream,
                                 Stream::new(send_stream, recv_stream),
