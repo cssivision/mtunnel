@@ -17,6 +17,8 @@ pub struct Client {
     pub remote_addr: String,
     pub domain_name: String,
     pub ca_certificate: String,
+    #[serde(default)]
+    pub buffer_size: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,6 +27,8 @@ pub struct Server {
     pub remote_addr: String,
     pub server_cert: String,
     pub server_key: String,
+    #[serde(default)]
+    pub buffer_size: Option<usize>,
 }
 
 impl Server {

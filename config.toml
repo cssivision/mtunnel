@@ -3,9 +3,13 @@ local_addr = "127.0.0.1:8080"
 remote_addr = "127.0.0.1:8081"
 domain_name = "mydomain.com"
 ca_certificate = "./tls_config/rootCA.crt"
+# copy buffer per direction, defaults to 16384, min 1024.
+# each process uses its own value, so set it on both sides.
+# buffer_size = 16384
 
 [server]
 local_addr = "127.0.0.1:8081"
 remote_addr = "127.0.0.1:8082"
 server_cert = "./tls_config/mydomain.com.crt"
 server_key = "./tls_config/mydomain.com.key"
+# buffer_size = 16384

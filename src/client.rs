@@ -30,13 +30,14 @@ pub async fn run(config: config::Client) -> io::Result<()> {
         .expect("invalid domain name")
         .to_owned();
     let h2 = Connection::new(Arc::new(tls_config), remote_addr, domain_name);
+    let buffer_size = crate::copy_buffer_size(config.buffer_size);
 
     loop {
         let (stream, addr) = listener.accept().await?;
         log::debug!("accept tcp from {:?}", addr);
         let h2 = h2.clone();
         awak::spawn(async move {
-            if let Err(e) = proxy(stream, h2).await {
+            if let Err(e) = proxy(stream, h2, buffer_size).await {
                 log::error!("proxy error {:?}", e);
             }
         })
@@ -44,10 +45,10 @@ pub async fn run(config: config::Client) -> io::Result<()> {
     }
 }
 
-async fn proxy(socket: TcpStream, mut h2: Connection) -> io::Result<()> {
+async fn proxy(socket: TcpStream, mut h2: Connection, buffer_size: usize) -> io::Result<()> {
     log::debug!("new h2 stream");
     let stream = timeout(Duration::from_secs(3), h2.new_stream()).await??;
     log::debug!("proxy to {:?}", stream.stream_id());
-    crate::proxy(socket, stream).await;
+    crate::proxy(socket, stream, buffer_size).await;
     Ok(())
 }

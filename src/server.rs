@@ -41,6 +41,7 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
     let listener = TcpListener::bind(&cfg.local_addr).await?;
     let tls_acceptor = TlsAcceptor::from(Arc::new(config));
     let remote_addrs = cfg.remote_socket_addrs();
+    let buffer_size = crate::copy_buffer_size(cfg.buffer_size);
     loop {
         let (stream, addr) = listener.accept().await?;
         log::debug!("accept tcp from {:?}", addr);
@@ -50,7 +51,7 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
             match timeout(ACCEPT_TLS_TIMEOUT, tls_acceptor.accept(stream)).await {
                 Ok(stream) => match stream {
                     Ok(stream) => {
-                        if let Err(e) = proxy(stream, remote_addrs).await {
+                        if let Err(e) = proxy(stream, remote_addrs, buffer_size).await {
                             log::error!("proxy h2 connection fail: {:?}", e);
                         }
                     }
@@ -67,7 +68,11 @@ pub async fn run(cfg: config::Server) -> io::Result<()> {
     }
 }
 
-async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Result<()> {
+async fn proxy(
+    stream: TlsStream<TcpStream>,
+    addrs: Vec<SocketAddr>,
+    buffer_size: usize,
+) -> io::Result<()> {
     let mut h2 = timeout(
         HANKSHAKE_TIMEOUT,
         server::Builder::new()
@@ -98,7 +103,12 @@ async fn proxy(stream: TlsStream<TcpStream>, addrs: Vec<SocketAddr>) -> io::Resu
                 Ok(stream) => {
                     match stream {
                         Ok(stream) => {
-                            crate::proxy(stream, Stream::new(send_stream, recv_stream)).await;
+                            crate::proxy(
+                                stream,
+                                Stream::new(send_stream, recv_stream),
+                                buffer_size,
+                            )
+                            .await;
                         }
                         Err(e) => {
                             log::error!("connect to {} err {:?}", addr, e);
