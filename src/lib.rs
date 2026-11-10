@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use awak::net::TcpStream;
-use awak::util::{copy_bidirectional_with_buffer_size, IdleTimeout};
+use awak::util::{copy_bidirectional_with_sizes, IdleTimeout};
 
 pub mod args;
 pub mod client;
@@ -41,7 +41,7 @@ pub fn copy_buffer_size(configured: Option<usize>) -> usize {
 
 pub async fn proxy(mut socket: TcpStream, mut stream: Stream, buffer_size: usize) {
     match IdleTimeout::new(
-        copy_bidirectional_with_buffer_size(&mut socket, &mut stream, buffer_size),
+        copy_bidirectional_with_sizes(&mut socket, &mut stream, buffer_size),
         DEFAULT_IDLE_TIMEOUT,
         DEFAULT_CHECK_INTERVAL,
     )

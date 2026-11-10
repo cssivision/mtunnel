@@ -5,7 +5,7 @@ authors = ["cssivision <cssivision@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-awak = "0.2"
+awak = "0.2.40"
 env_logger = "0.11"
 serde = { version = "1", features = ["derive"] }
 h2 = "0.4"
