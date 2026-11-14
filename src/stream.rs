@@ -106,14 +106,13 @@ impl AsyncRead for Stream {
             if !self.recv_stream.buf.is_empty() {
                 let n = self.recv_stream.buf.len().min(buf.len());
                 buf[..n].copy_from_slice(&self.recv_stream.buf.split_to(n));
-                // Only open the flow-control window once the bytes have been
-                // handed to the caller, so a peer cannot outrun the sink.
-                self.recv_stream.release_capacity(n)?;
                 return Poll::Ready(Ok(n));
             }
             if !self.recv_stream.read_closed {
                 if let Some(data) = ready!(self.recv_stream.poll_data(cx)) {
-                    self.recv_stream.buf = data?;
+                    let data = data?;
+                    self.recv_stream.release_capacity(data.len())?;
+                    self.recv_stream.buf = data;
                 } else {
                     self.recv_stream.read_closed = self.recv_stream.inner.is_end_stream();
                 }
@@ -131,12 +130,8 @@ impl AsyncWrite for Stream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        if buf.is_empty() {
-            return Poll::Ready(Ok(0));
-        }
-
         self.send_stream.reserve_capacity(buf.len());
-        let capacity = match ready!(self.send_stream.poll_capacity(cx)) {
+        match ready!(self.send_stream.poll_capacity(cx)) {
             Some(v) => v?,
             None => return Poll::Ready(Err(io::Error::other("poll capacity unexpectedly closed"))),
         };
@@ -148,12 +143,9 @@ impl AsyncWrite for Stream {
             ))));
         }
 
-        // `poll_capacity` may grant less than what was reserved; sending more
-        // than that would be buffered by h2 without any bound.
-        let n = capacity.min(buf.len());
         self.send_stream
-            .send_data(Bytes::copy_from_slice(&buf[..n]), false)?;
-        Poll::Ready(Ok(n))
+            .send_data(Bytes::copy_from_slice(buf), false)?;
+        Poll::Ready(Ok(buf.len()))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
